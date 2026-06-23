@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}Profil - Tigers Members{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold">Profil</h1>
+    <p class="text-sm text-slate-500 mt-1">Deine aktuell freigegebenen Rollen und Teams.</p>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <section class="bg-white border border-slate-200 rounded-lg shadow-sm p-6">
+        <h2 class="font-semibold mb-4">Stammdaten</h2>
+        <dl class="space-y-3 text-sm">
+            <div><dt class="text-slate-500">Benutzername</dt><dd class="font-medium">{{ current_user.username }}</dd></div>
+            <div><dt class="text-slate-500">Name</dt><dd class="font-medium">{{ current_user.display_name }}</dd></div>
+            <div><dt class="text-slate-500">E-Mail</dt><dd class="font-medium">{{ current_user.email or '-' }}</dd></div>
+        </dl>
+        <a href="{{ url_for('main.profile') }}" class="inline-flex items-center gap-2 mt-5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">
+            <i class="bi bi-pencil"></i>Profil bearbeiten
+        </a>
+    </section>
+
+    <section class="bg-white border border-slate-200 rounded-lg shadow-sm p-6">
+        <h2 class="font-semibold mb-4">Teams und Rollen</h2>
+        {% set memberships = current_user.claims_json.get('memberships', []) %}
+        {% set pending_memberships = current_user.claims_json.get('pending_memberships', []) %}
+        {% if memberships %}
+        <div class="space-y-2">
+            {% for membership in memberships %}
+            <div class="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                <span class="font-medium">{{ membership.team_name or membership.team_code }}</span>
+                <span class="text-slate-500">{{ membership.member_role }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-slate-500">Noch keine Team-Zuordnung.</p>
+        {% endif %}
+        {% if pending_memberships %}
+        <div class="mt-4 pt-4 border-t border-slate-200">
+            <p class="text-xs font-medium uppercase text-slate-500 mb-2">Beantragt</p>
+            {% for membership in pending_memberships %}
+            <div class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                <span class="font-medium">{{ membership.team_name or membership.team_code }}</span>
+                <span class="text-amber-700">{{ membership.member_role }} · wartet auf Freigabe</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
