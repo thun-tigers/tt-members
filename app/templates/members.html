@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Mitglieder – Tigers Members{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-start gap-3">
+    <div class="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg mt-0.5">
+        <i class="bi bi-person-lines-fill text-indigo-600 dark:text-indigo-400 text-xl"></i>
+    </div>
+    <div>
+        <h1 class="text-2xl font-bold">Mitglieder</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            {% if is_platform_admin %}
+            Alle aktiven Benutzer sind sichtbar. Du kannst Team-Rollen und Zuordnungen direkt anpassen.
+            {% else %}
+            Hier siehst du die Benutzer aus deinen Teams und kannst ihre Rollen verwalten.
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<form method="GET" class="mb-6 flex flex-col sm:flex-row gap-3">
+    <input
+        type="search"
+        name="q"
+        value="{{ query }}"
+        placeholder="Nach Benutzer, Name oder E-Mail suchen"
+        class="w-full sm:max-w-xl px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+    >
+    <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition">
+        <i class="bi bi-search"></i>
+        Suchen
+    </button>
+</form>
+
+<div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
+    {% if users %}
+    <table class="w-full text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-700/50">
+            <tr>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Benutzer</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Teams</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 hidden md:table-cell">Status</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Aktion</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+            {% for user in users %}
+            <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                <td class="px-4 py-3">
+                    <div class="font-medium text-slate-900 dark:text-white">{{ user.display_name or user.username }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">@{{ user.username }}</div>
+                    {% if user.email %}
+                    <div class="text-xs text-slate-400 dark:text-slate-500">{{ user.email }}</div>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1.5">
+                        {% if user.active_memberships %}
+                            {% for membership in user.active_memberships %}
+                            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
+                                {{ membership.team.name or membership.team.code or membership.team.id }}: {{ role_labels.get(membership.member_role, membership.member_role) }}
+                            </span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-xs text-slate-500 dark:text-slate-400">Keine aktive Zuordnung</span>
+                        {% endif %}
+                    </div>
+                    {% if user.pending_memberships %}
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        {% for membership in user.pending_memberships %}
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                            Beantragt: {{ membership.team.name or membership.team.code or membership.team.id }} · {{ role_labels.get(membership.member_role, membership.member_role) }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ user.account_status|upper }}
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {% if user.profile_complete %}Profil vollständig{% else %}Profil unvollständig{% endif %}
+                    </div>
+                </td>
+                <td class="px-4 py-3">
+                    <a href="{{ url_for('main.member_detail', target_user_id=user.id) }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition">
+                        <i class="bi bi-sliders"></i>
+                        Öffnen
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="py-16 text-center text-slate-500 dark:text-slate-400">
+        <i class="bi bi-inbox text-4xl mb-3 block"></i>
+        Keine passenden Mitglieder gefunden.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

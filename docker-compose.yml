@@ -11,6 +11,7 @@ services:
       - SQLALCHEMY_DATABASE_URI=${SQLALCHEMY_DATABASE_URI:-sqlite:////app/instance/members.db}
       - AUTH_BASE_URL=${AUTH_BASE_URL:-http://localhost:8085}
       - TT_AUTH_INTERNAL_URL=${TT_AUTH_INTERNAL_URL:-http://host.docker.internal:8085}
+      - TT_INFRA_INTERNAL_URL=${TT_INFRA_INTERNAL_URL:-http://host.docker.internal:8084}
       - SSO_SHARED_SECRET=${SSO_SHARED_SECRET:-tt-sso-dev-secret-change-me}
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-tt-internal-dev-secret-change-me}
       - SSO_EXPECTED_AUDIENCE=tt-members

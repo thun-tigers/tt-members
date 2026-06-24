@@ -1,0 +1,308 @@
+{% extends 'base.html' %}
+{% block title %}Mitglied bearbeiten – Tigers Members{% endblock %}
+
+{% block content %}
+<div class="mb-8 flex items-start gap-3">
+    <div class="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg mt-0.5">
+        <i class="bi bi-sliders text-indigo-600 dark:text-indigo-400 text-xl"></i>
+    </div>
+    <div>
+        <h1 class="text-2xl font-bold">{{ user_payload.display_name or user_payload.username }}</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Aktive Team-Rollen direkt verwalten. Änderungen werden in tt-auth gespeichert und stehen danach in allen Apps zur Verfügung.
+        </p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="lg:col-span-1 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Benutzerdaten</h2>
+        </div>
+        <div class="p-5 space-y-4 text-sm">
+            <div class="flex justify-between gap-3">
+                <span class="text-slate-500 dark:text-slate-400">Benutzername</span>
+                <span class="font-medium text-right">{{ user_payload.username }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+                <span class="text-slate-500 dark:text-slate-400">E-Mail</span>
+                <span class="font-medium text-right">{{ user_payload.email or '–' }}</span>
+            </div>
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Profilinformationen</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Vorname <span class="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            name="first_name"
+                            value="{{ member_profile.first_name if member_profile and member_profile.first_name is not none else (member_user.first_name if member_user and member_user.first_name is not none else '') }}"
+                            required
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Nachname <span class="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            name="last_name"
+                            value="{{ member_profile.last_name if member_profile and member_profile.last_name is not none else (member_user.last_name if member_user and member_user.last_name is not none else '') }}"
+                            required
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">E-Mail <span class="text-red-500">*</span></label>
+                        <input
+                            type="email"
+                            name="email"
+                            value="{{ member_profile.email if member_profile and member_profile.email is not none else (member_user.email if member_user and member_user.email is not none else '') }}"
+                            required
+                            placeholder="name@domain.ch"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Mobile Phone <span class="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            name="phone"
+                            value="{{ member_profile.phone or '' }}"
+                            required
+                            placeholder="z. B. +41 79 123 45 67"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Geburtsdatum <span class="text-red-500">*</span></label>
+                        <input
+                            type="date"
+                            name="birth_date"
+                            value="{{ member_profile.birth_date.isoformat() if member_profile and member_profile.birth_date else '' }}"
+                            required
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Nationalität</label>
+                        <input
+                            type="text"
+                            name="nationality"
+                            value="{{ member_profile.nationality or '' }}"
+                            placeholder="z. B. Schweiz"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Adresse 1 <span class="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            name="address_line1"
+                            value="{{ member_profile.address_line1 or '' }}"
+                            required
+                            placeholder="Strasse und Hausnummer"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Adresse 2</label>
+                        <input
+                            type="text"
+                            name="address_line2"
+                            value="{{ member_profile.address_line2 or '' }}"
+                            placeholder="Wohnung, Zusatz, c/o"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Postleitzahl <span class="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            name="postal_code"
+                            value="{{ member_profile.postal_code or '' }}"
+                            required
+                            placeholder="z. B. 3624"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Ort <span class="text-red-500">*</span></label>
+                        <input
+                            type="text"
+                            name="city"
+                            value="{{ member_profile.city or '' }}"
+                            required
+                            placeholder="z. B. Goldiwil"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Kontaktdaten</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Lizenznummer</label>
+                        <input
+                            type="text"
+                            name="license_number"
+                            value="{{ member_profile.license_number or '' }}"
+                            placeholder="Nur Team-Manager"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Diese Angabe wird nur vom Team-Manager gepflegt.</p>
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Grösse</label>
+                        <input
+                            type="text"
+                            name="shirt_size"
+                            value="{{ member_profile.shirt_size or '' }}"
+                            placeholder="z. B. M"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Bemerkungen</label>
+                        <textarea
+                            name="notes"
+                            rows="3"
+                            placeholder="Optionale Hinweise..."
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                        >{{ member_profile.notes or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Spielerdaten</h3>
+                <div class="grid grid-cols-1 gap-3">
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Position</label>
+                        <select
+                            name="position"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                            <option value="">Bitte wählen</option>
+                            {% set current_position = member_profile.position if member_profile and member_profile.position is not none else '' %}
+                            {% set position_values = position_options | map(attribute='key') | list %}
+                            {% if current_position and current_position not in position_values %}
+                            <option value="{{ current_position }}" selected>{{ position_labels.get(current_position, current_position) }}</option>
+                            {% endif %}
+                            {% for option in position_options %}
+                            <option value="{{ option.key }}" {% if current_position == option.key %}selected{% endif %}>{{ option.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 dark:text-slate-400 mb-1">Trikotnummer</label>
+                        <input
+                            type="text"
+                            name="jersey_number"
+                            value="{{ member_profile.jersey_number or '' }}"
+                            placeholder="z. B. 12"
+                            class="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        >
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between gap-3">
+                <span class="text-slate-500 dark:text-slate-400">Status</span>
+                <span class="font-medium text-right">{{ user_payload.account_status|upper }}</span>
+            </div>
+            <div class="flex justify-between gap-3">
+                <span class="text-slate-500 dark:text-slate-400">Profil</span>
+                <span class="font-medium text-right">{% if user_payload.profile_complete %}vollständig{% else %}offen{% endif %}</span>
+            </div>
+            <div class="pt-2 text-xs text-slate-500 dark:text-slate-400">
+                {% if is_platform_admin %}
+                Plattform-Admin kann alle Teams bearbeiten.
+                {% else %}
+                Bearbeitbar sind nur die Teams aus deinem Verantwortungsbereich.
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="lg:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Aktive Mitgliedschaften</h2>
+            <span class="text-xs text-slate-500 dark:text-slate-400">{{ teams|length }} Teams</span>
+        </div>
+        <form method="POST" class="p-5 space-y-4">
+            {% if teams %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for team in teams %}
+                    {% set current_roles = team_roles.get(team.id, []) %}
+                    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/30 p-4">
+                        <div class="flex items-start justify-between gap-3 mb-3">
+                            <div>
+                                <div class="font-semibold text-slate-900 dark:text-white">{{ team.name }}</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">{{ team.code }}</div>
+                            </div>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                {% if current_roles %}
+                                    {% for current_role in current_roles %}
+                                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                        {{ role_labels.get(current_role, current_role) }}
+                                    </span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                        Ohne aktive Rolle
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            {% for role_key, role_label in role_labels.items() if role_key != 'none' %}
+                            <label class="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">
+                                <input
+                                    type="checkbox"
+                                    name="team_{{ team.id }}_role_{{ role_key }}"
+                                    value="1"
+                                    {% if role_key in current_roles %}checked{% endif %}
+                                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-400"
+                                >
+                                <span class="font-medium text-slate-700 dark:text-slate-200">{{ role_label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="py-10 text-center text-slate-500 dark:text-slate-400">
+                    Keine Teams im erlaubten Bereich vorhanden.
+                </div>
+            {% endif %}
+
+            {% if user_payload.pending_memberships %}
+            <div class="pt-4 border-t border-slate-100 dark:border-slate-700">
+                <div class="mb-3">
+                    <h3 class="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">Beantragte Mitgliedschaften</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Diese Einträge sind noch nicht wirksam, bleiben aber beim Speichern erhalten.</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    {% for membership in user_payload.pending_memberships %}
+                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                        {{ membership.team.name or membership.team.code or membership.team.id }}: {{ role_labels.get(membership.member_role, membership.member_role) }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                <a href="{{ url_for('main.members') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                    <i class="bi bi-arrow-left"></i>
+                    Zurück
+                </a>
+                <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition">
+                    <i class="bi bi-check2"></i>
+                    Speichern
+                </button>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}

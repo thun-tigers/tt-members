@@ -9,7 +9,7 @@
     </div>
     <div>
         <h1 class="text-2xl font-bold">{{ current_user.display_name or current_user.username }}</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Deine aktuell freigegebenen Rollen und Teams.</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Hier siehst du, was bereits freigegeben ist und was noch auf Freigabe wartet.</p>
     </div>
 </div>
 
@@ -55,12 +55,13 @@
             {% set memberships = current_user.claims_json.get('memberships', []) %}
             {% set pending_memberships = current_user.claims_json.get('pending_memberships', []) %}
             {% set role_labels = {'player': 'Spieler', 'coach': 'Coach', 'head_coach': 'Head Coach', 'team_manager': 'Team-Manager'} %}
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Aktive Mitgliedschaften gelten in den Apps sofort. Beantragte Rollen sind sichtbar, aber noch nicht wirksam.</p>
             {% if memberships %}
             <div class="space-y-2">
                 {% for membership in memberships %}
                 <div class="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 px-3 py-2.5 text-sm">
                     <span class="font-medium">{{ membership.team_name or membership.team_code }}</span>
-                    <span class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full">{{ role_labels.get(membership.member_role, membership.member_role) }}</span>
+                    <span class="text-xs px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded-full">Aktiv · {{ role_labels.get(membership.member_role, membership.member_role) }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -76,21 +77,34 @@
                 {% for membership in pending_memberships %}
                 <div class="flex items-center justify-between rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 text-sm">
                     <span class="font-medium">{{ membership.team_name or membership.team_code }}</span>
-                    <span class="text-xs text-amber-700 dark:text-amber-300">{{ role_labels.get(membership.member_role, membership.member_role) }} · wartet auf Freigabe</span>
+                    <span class="text-xs text-amber-700 dark:text-amber-300">Beantragt · {{ role_labels.get(membership.member_role, membership.member_role) }}</span>
                 </div>
                 {% endfor %}
             </div>
             {% endif %}
 
-            {% set manager_memberships = memberships | selectattr('member_role', 'equalto', 'team_manager') | list %}
-            {% if manager_memberships %}
+        {% set manager_memberships = memberships | selectattr('member_role', 'equalto', 'team_manager') | list %}
+        {% if current_user.platform_role == 'admin' or manager_memberships %}
             <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                 <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5 text-sm text-blue-800 dark:text-blue-300">
-                    <div class="font-semibold">Team-Manager erkannt</div>
+                    <div class="font-semibold">{% if current_user.platform_role == 'admin' %}Plattform-Admin mit Vollzugriff{% else %}Antrags-Rechte erkannt{% endif %}</div>
                     <div class="text-xs mt-1">Du kannst jetzt offene Team-Anträge direkt in TT-Members freigeben.</div>
-                    <a href="{{ url_for('main.team_manager') }}" class="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+                    <a href="{{ url_for('main.antraege') }}" class="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
                         <i class="bi bi-people-fill"></i>
-                        Team-Manager öffnen
+                        Anträge öffnen
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if current_user.platform_role == 'admin' or manager_memberships %}
+            <div class="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                <div class="rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2.5 text-sm text-indigo-800 dark:text-indigo-300">
+                    <div class="font-semibold">Mitglieder verwalten</div>
+                    <div class="text-xs mt-1">Hier kannst du Rollen und Team-Zuordnungen direkt anpassen.</div>
+                    <a href="{{ url_for('main.members') }}" class="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">
+                        <i class="bi bi-person-lines-fill"></i>
+                        Mitglieder öffnen
                     </a>
                 </div>
             </div>

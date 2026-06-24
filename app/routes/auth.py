@@ -92,6 +92,8 @@ def sso_login():
     session['user_id'] = user.id
     session['auth_user_id'] = user.auth_user_id
     session['username'] = user.username
+    session['platform_role'] = user.platform_role
+    session['permissions'] = payload.get('permissions') or []
     session['nonce'] = secrets.token_hex(8)
 
     next_page = request.args.get('next')
