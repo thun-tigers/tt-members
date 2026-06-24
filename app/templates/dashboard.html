@@ -54,12 +54,13 @@
         <div class="p-6">
             {% set memberships = current_user.claims_json.get('memberships', []) %}
             {% set pending_memberships = current_user.claims_json.get('pending_memberships', []) %}
+            {% set role_labels = {'player': 'Spieler', 'coach': 'Coach', 'head_coach': 'Head Coach', 'team_manager': 'Team-Manager'} %}
             {% if memberships %}
             <div class="space-y-2">
                 {% for membership in memberships %}
                 <div class="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 px-3 py-2.5 text-sm">
                     <span class="font-medium">{{ membership.team_name or membership.team_code }}</span>
-                    <span class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full">{{ membership.member_role }}</span>
+                    <span class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-full">{{ role_labels.get(membership.member_role, membership.member_role) }}</span>
                 </div>
                 {% endfor %}
             </div>
@@ -75,9 +76,23 @@
                 {% for membership in pending_memberships %}
                 <div class="flex items-center justify-between rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 text-sm">
                     <span class="font-medium">{{ membership.team_name or membership.team_code }}</span>
-                    <span class="text-xs text-amber-700 dark:text-amber-300">{{ membership.member_role }} · wartet auf Freigabe</span>
+                    <span class="text-xs text-amber-700 dark:text-amber-300">{{ role_labels.get(membership.member_role, membership.member_role) }} · wartet auf Freigabe</span>
                 </div>
                 {% endfor %}
+            </div>
+            {% endif %}
+
+            {% set manager_memberships = memberships | selectattr('member_role', 'equalto', 'team_manager') | list %}
+            {% if manager_memberships %}
+            <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5 text-sm text-blue-800 dark:text-blue-300">
+                    <div class="font-semibold">Team-Manager erkannt</div>
+                    <div class="text-xs mt-1">Du kannst jetzt offene Team-Anträge direkt in TT-Members freigeben.</div>
+                    <a href="{{ url_for('main.team_manager') }}" class="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+                        <i class="bi bi-people-fill"></i>
+                        Team-Manager öffnen
+                    </a>
+                </div>
             </div>
             {% endif %}
         </div>

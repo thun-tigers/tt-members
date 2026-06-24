@@ -37,6 +37,60 @@ def index():
     return render_template('dashboard.html', current_user=user)
 
 
+@bp.route('/team-manager')
+@login_required
+def team_manager():
+    user = current_user()
+    managed_team_codes = _managed_team_codes(user)
+    if not managed_team_codes:
+        flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
+        return redirect(url_for('main.index'))
+
+    pending_users, fetch_error = _fetch_pending_users_for_manager(user)
+    if fetch_error:
+        flash(fetch_error, 'danger')
+
+    return render_template(
+        'team_manager.html',
+        current_user=user,
+        managed_team_codes=managed_team_codes,
+        pending_users=pending_users,
+    )
+
+
+@bp.route('/team-manager/approve/<int:target_user_id>', methods=['POST'])
+@login_required
+def approve_pending_user(target_user_id):
+    user = current_user()
+    if not _managed_team_codes(user):
+        flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
+        return redirect(url_for('main.index'))
+
+    ok, error = _approve_user_via_auth(user, target_user_id)
+    if ok:
+        flash('Benutzer erfolgreich freigegeben.', 'success')
+    else:
+        flash(error or 'Freigabe fehlgeschlagen.', 'danger')
+    return redirect(url_for('main.team_manager'))
+
+
+@bp.route('/team-manager/reject/<int:target_user_id>', methods=['POST'])
+@login_required
+def reject_pending_user(target_user_id):
+    user = current_user()
+    if not _managed_team_codes(user):
+        flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
+        return redirect(url_for('main.index'))
+
+    reason = (request.form.get('reason') or '').strip()
+    ok, error = _reject_user_via_auth(user, target_user_id, reason)
+    if ok:
+        flash('Antrag wurde abgelehnt.', 'success')
+    else:
+        flash(error or 'Ablehnung fehlgeschlagen.', 'danger')
+    return redirect(url_for('main.team_manager'))
+
+
 @bp.route('/submitted')
 @login_required
 def submitted():
@@ -111,3 +165,95 @@ def _notify_auth_profile_complete(auth_user_id):
     except requests.RequestException as exc:
         current_app.logger.warning('tt-auth profile sync failed: %s', exc)
         return False
+
+
+def _managed_team_codes(user):
+    memberships = (user.claims_json or {}).get('memberships', [])
+    team_codes = {
+        (membership.get('team_code') or '').strip().upper()
+        for membership in memberships
+        if membership.get('member_role') in {'team_manager', 'head_coach'} and membership.get('team_code')
+    }
+    return sorted(code for code in team_codes if code)
+
+
+def _fetch_pending_users_for_manager(user):
+    auth_base = current_app.config.get('TT_AUTH_INTERNAL_URL', 'http://tt-auth:5000').rstrip('/')
+    secret = current_app.config.get('INTERNAL_API_SECRET')
+    if not secret:
+        return [], 'INTERNAL_API_SECRET ist nicht konfiguriert.'
+
+    try:
+        response = requests.get(
+            f'{auth_base}/api/team-manager/pending-users',
+            params={'approver_auth_user_id': user.auth_user_id},
+            headers={'X-TT-Internal-Secret': secret},
+            timeout=3,
+        )
+        if response.status_code >= 400:
+            current_app.logger.warning('tt-auth pending fetch failed: %s %s', response.status_code, response.text)
+            return [], 'Offene Anträge konnten nicht geladen werden.'
+        payload = response.json() or {}
+        return payload.get('pending_users', []), None
+    except requests.RequestException as exc:
+        current_app.logger.warning('tt-auth pending fetch failed: %s', exc)
+        return [], 'Offene Anträge konnten nicht geladen werden.'
+
+
+def _approve_user_via_auth(user, target_user_id):
+    auth_base = current_app.config.get('TT_AUTH_INTERNAL_URL', 'http://tt-auth:5000').rstrip('/')
+    secret = current_app.config.get('INTERNAL_API_SECRET')
+    if not secret:
+        return False, 'INTERNAL_API_SECRET ist nicht konfiguriert.'
+
+    try:
+        response = requests.post(
+            f'{auth_base}/api/team-manager/approve-user',
+            json={
+                'approver_auth_user_id': user.auth_user_id,
+                'target_user_id': target_user_id,
+            },
+            headers={'X-TT-Internal-Secret': secret},
+            timeout=3,
+        )
+        if response.status_code >= 400:
+            current_app.logger.warning('tt-auth approve failed: %s %s', response.status_code, response.text)
+            if response.status_code == 403:
+                return False, 'Keine Berechtigung für diese Freigabe.'
+            if response.status_code == 409:
+                return False, 'Antrag ist nicht mehr freigabefähig.'
+            return False, 'Freigabe konnte nicht durchgeführt werden.'
+        return True, None
+    except requests.RequestException as exc:
+        current_app.logger.warning('tt-auth approve failed: %s', exc)
+        return False, 'Freigabe konnte nicht durchgeführt werden.'
+
+
+def _reject_user_via_auth(user, target_user_id, reason):
+    auth_base = current_app.config.get('TT_AUTH_INTERNAL_URL', 'http://tt-auth:5000').rstrip('/')
+    secret = current_app.config.get('INTERNAL_API_SECRET')
+    if not secret:
+        return False, 'INTERNAL_API_SECRET ist nicht konfiguriert.'
+
+    try:
+        response = requests.post(
+            f'{auth_base}/api/team-manager/reject-user',
+            json={
+                'approver_auth_user_id': user.auth_user_id,
+                'target_user_id': target_user_id,
+                'reason': reason,
+            },
+            headers={'X-TT-Internal-Secret': secret},
+            timeout=3,
+        )
+        if response.status_code >= 400:
+            current_app.logger.warning('tt-auth reject failed: %s %s', response.status_code, response.text)
+            if response.status_code == 403:
+                return False, 'Keine Berechtigung für diese Ablehnung.'
+            if response.status_code == 409:
+                return False, 'Antrag ist nicht mehr ablehnbar.'
+            return False, 'Ablehnung konnte nicht durchgeführt werden.'
+        return True, None
+    except requests.RequestException as exc:
+        current_app.logger.warning('tt-auth reject failed: %s', exc)
+        return False, 'Ablehnung konnte nicht durchgeführt werden.'
