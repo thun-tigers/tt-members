@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from .extensions import db
+from .authz import normalize_auth_payload
 
 
 class User(db.Model):
@@ -22,6 +23,21 @@ class User(db.Model):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+    def sync_from_sso_claims(self, payload):
+        auth = normalize_auth_payload(payload)
+        claims = auth["claims"]
+
+        self.auth_user_id = int(claims["sub"])
+        self.username = (claims.get("username") or self.username).strip()
+        self.first_name = claims.get("first_name")
+        self.last_name = claims.get("last_name")
+        self.display_name = claims.get("display_name") or self.username
+        self.email = claims.get("email")
+        self.platform_role = auth["platform_role"]
+        self.service_role = auth["service_role"]
+        self.profile_complete = bool(claims.get("profile_complete"))
+        self.claims_json = claims
 
 
 class MemberProfile(db.Model):

@@ -2,6 +2,7 @@ from flask import Flask
 from flask import session
 from sqlalchemy import inspect, text
 
+from .authz import is_platform_admin, normalize_memberships, normalize_permissions
 from .config import Config
 from .extensions import db, limiter
 
@@ -40,12 +41,11 @@ def create_app(config_class=Config):
         if not user:
             return {'pending_antraege_count': 0}
 
-        platform_role = (user.platform_role or '').strip().lower()
         claims = user.claims_json or {}
-        permissions = claims.get('permissions') or []
-        managed_team = platform_role == 'admin' or (claims.get('platform_role') or '').strip().lower() == 'admin' or '*' in permissions
+        permissions = normalize_permissions(claims.get('permissions'))
+        managed_team = is_platform_admin(user.platform_role, permissions)
         if not managed_team:
-            memberships = claims.get('memberships', [])
+            memberships = normalize_memberships(claims.get('memberships'))
             managed_team = any(
                 membership.get('member_role') in {'team_manager', 'head_coach'}
                 for membership in memberships

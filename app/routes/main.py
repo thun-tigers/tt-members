@@ -5,6 +5,7 @@ import re
 import requests
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
+from ..authz import is_platform_admin, normalize_memberships, normalize_permissions
 from ..extensions import db
 from ..models import MemberProfile, User
 
@@ -333,7 +334,7 @@ def _notify_auth_profile_complete(auth_user_id):
 
 
 def _managed_team_codes(user):
-    memberships = (user.claims_json or {}).get('memberships', [])
+    memberships = normalize_memberships((user.claims_json or {}).get('memberships'))
     team_codes = {
         (membership.get('team_code') or '').strip().upper()
         for membership in memberships
@@ -345,13 +346,8 @@ def _managed_team_codes(user):
 def _is_platform_admin(user):
     if not user:
         return False
-    if (user.platform_role or '').strip().lower() == 'admin':
-        return True
     claims = user.claims_json or {}
-    if (claims.get('platform_role') or '').strip().lower() == 'admin':
-        return True
-    permissions = claims.get('permissions') or []
-    return '*' in permissions
+    return is_platform_admin(user.platform_role, normalize_permissions(claims.get('permissions')))
 
 
 def _can_manage_members(user):

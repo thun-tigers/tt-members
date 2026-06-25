@@ -4,6 +4,7 @@ from urllib.parse import urlencode, urljoin, urlparse
 import jwt
 from flask import Blueprint, current_app, flash, redirect, request, session, url_for
 
+from ..authz import normalize_auth_payload
 from ..extensions import db, limiter
 from ..models import User
 
@@ -62,8 +63,10 @@ def sso_login():
         flash('Ungültiger SSO-Token.', 'danger')
         return redirect(url_for('auth.login'))
 
-    auth_user_id = int(payload['sub'])
-    username = (payload.get('username') or '').strip()
+    auth = normalize_auth_payload(payload)
+    claims = auth['claims']
+    auth_user_id = int(claims['sub'])
+    username = (claims.get('username') or '').strip()
     if not username:
         flash('SSO-Token enthält keinen Benutzernamen.', 'danger')
         return redirect(url_for('auth.login'))
@@ -78,22 +81,19 @@ def sso_login():
             user = User(auth_user_id=auth_user_id, username=username)
             db.session.add(user)
 
-    user.username = username
-    user.first_name = payload.get('first_name')
-    user.last_name = payload.get('last_name')
-    user.display_name = payload.get('display_name') or username
-    user.email = payload.get('email')
-    user.platform_role = payload.get('platform_role') or 'user'
-    user.service_role = payload.get('service_role') or payload.get('role') or 'user'
-    user.profile_complete = bool(payload.get('profile_complete'))
-    user.claims_json = payload
+    user.sync_from_sso_claims(claims)
     db.session.commit()
 
     session['user_id'] = user.id
     session['auth_user_id'] = user.auth_user_id
     session['username'] = user.username
+    session['user_role'] = user.service_role
     session['platform_role'] = user.platform_role
-    session['permissions'] = payload.get('permissions') or []
+    session['display_name'] = user.display_name or user.username
+    session['profile_complete'] = user.profile_complete
+    session['memberships'] = auth['memberships']
+    session['permissions'] = auth['permissions']
+    session['claims_json'] = claims
     session['nonce'] = secrets.token_hex(8)
 
     next_page = request.args.get('next')
