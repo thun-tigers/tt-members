@@ -14,7 +14,7 @@
     </div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<form method="POST" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="lg:col-span-1 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Benutzerdaten</h2>
@@ -228,7 +228,7 @@
             <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Aktive Mitgliedschaften</h2>
             <span class="text-xs text-slate-500 dark:text-slate-400">{{ teams|length }} Teams</span>
         </div>
-        <form method="POST" class="p-5 space-y-4">
+        <div class="p-5 space-y-4">
             {% if teams %}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {% for team in teams %}
@@ -302,7 +302,7 @@
                     Speichern
                 </button>
             </div>
-        </form>
+        </div>
     </section>
-</div>
+</form>
 {% endblock %}
