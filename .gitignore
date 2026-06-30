@@ -1,5 +1,16 @@
 .env
 instance/
 *.db
+*.db.bak
 __pycache__/
 *.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+.pytest_cache/
+.coverage
+*.log
