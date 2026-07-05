@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% set active_tab = "members" %}
-{% block title %}Mitglied bearbeiten – Tigers Members{% endblock %}
+{% block title %}{{ 'Mitglied bearbeiten' if can_edit_member else 'Mitglied ansehen' }} – Tigers Members{% endblock %}
 
 {% block content %}
 <div class="mb-8 flex items-start gap-3">
@@ -11,7 +11,11 @@
     <div>
         <h1 class="text-2xl font-bold">{{ user_payload.display_name or user_payload.username }}</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            {% if can_edit_member %}
             Aktive Team-Rollen direkt verwalten. Änderungen werden in tt-auth gespeichert und stehen danach in allen Apps zur Verfügung.
+            {% else %}
+            Du siehst die Mitgliederdaten im Lesemodus. Änderungen sind mit deiner Rolle nicht erlaubt.
+            {% endif %}
         </p>
     </div>
 </div>
@@ -299,10 +303,12 @@
                     <i class="bi bi-arrow-left"></i>
                     Zurück
                 </a>
+                {% if can_edit_member %}
                 <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition">
                     <i class="bi bi-check2"></i>
                     Speichern
                 </button>
+                {% endif %}
             </div>
         </div>
     </section>

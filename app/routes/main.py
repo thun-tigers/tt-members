@@ -5,7 +5,7 @@ import re
 import requests
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
-from ..authz import is_platform_admin, normalize_memberships, normalize_permissions
+from ..authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
 from ..extensions import db
 from ..models import MemberProfile, User
 
@@ -46,7 +46,7 @@ def antraege():
     user = current_user()
     is_platform_admin = _is_platform_admin(user)
     managed_team_codes = _managed_team_codes(user)
-    if not is_platform_admin and not managed_team_codes:
+    if not is_platform_admin and not _has_members_manage_permission(user) and not managed_team_codes:
         flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -67,7 +67,7 @@ def antraege():
 @login_required
 def members():
     user = current_user()
-    if not _can_manage_members(user):
+    if not _can_view_members(user):
         flash('Kein Zugriff auf die Mitgliederverwaltung.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -85,6 +85,7 @@ def members():
         is_platform_admin=payload.get('is_platform_admin', False),
         query=query,
         role_labels=_role_labels(),
+        can_edit_members=_can_edit_members(user),
     )
 
 
@@ -92,9 +93,11 @@ def members():
 @login_required
 def member_detail(target_user_id):
     user = current_user()
-    if not _can_manage_members(user):
+    if not _can_view_members(user):
         flash('Kein Zugriff auf die Mitgliederverwaltung.', 'danger')
         return redirect(url_for('main.index'))
+
+    can_edit_member = _can_edit_members(user)
 
     local_target_user = db.session.query(User).filter_by(auth_user_id=target_user_id).first()
     if not local_target_user:
@@ -104,6 +107,10 @@ def member_detail(target_user_id):
     position_labels = {item['key']: item['label'] for item in position_options}
 
     if request.method == 'POST':
+        if not can_edit_member:
+            flash('Du hast nur Lesezugriff auf Mitgliederdaten.', 'danger')
+            return redirect(url_for('main.member_detail', target_user_id=target_user_id))
+
         selected_memberships = []
         for key in request.form:
             match = re.match(r'^team_(\d+)_role_(.+)$', key)
@@ -181,6 +188,7 @@ def member_detail(target_user_id):
         user_payload=payload.get('user', {}),
         teams=payload.get('teams', []),
         is_platform_admin=payload.get('is_platform_admin', False),
+        can_edit_member=can_edit_member,
         role_labels=_role_labels(),
         member_profile=target_profile,
         member_user=local_target_user,
@@ -197,7 +205,7 @@ def member_detail(target_user_id):
 @login_required
 def approve_pending_user(target_user_id):
     user = current_user()
-    if not _is_platform_admin(user) and not _managed_team_codes(user):
+    if not _is_platform_admin(user) and not _has_members_manage_permission(user) and not _managed_team_codes(user):
         flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -213,7 +221,7 @@ def approve_pending_user(target_user_id):
 @login_required
 def reject_pending_user(target_user_id):
     user = current_user()
-    if not _is_platform_admin(user) and not _managed_team_codes(user):
+    if not _is_platform_admin(user) and not _has_members_manage_permission(user) and not _managed_team_codes(user):
         flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
         return redirect(url_for('main.index'))
 
@@ -343,6 +351,16 @@ def _managed_team_codes(user):
     return sorted(code for code in team_codes if code)
 
 
+def _viewer_team_codes(user):
+    memberships = normalize_memberships((user.claims_json or {}).get('memberships'))
+    team_codes = {
+        (membership.get('team_code') or '').strip().upper()
+        for membership in memberships
+        if membership.get('member_role') in {'coach', 'team_manager', 'team_betreuer', 'head_coach'} and membership.get('team_code')
+    }
+    return sorted(code for code in team_codes if code)
+
+
 def _is_platform_admin(user):
     if not user:
         return False
@@ -350,8 +368,29 @@ def _is_platform_admin(user):
     return is_platform_admin(user.platform_role, normalize_permissions(claims.get('permissions')))
 
 
-def _can_manage_members(user):
-    return _is_platform_admin(user) or bool(_managed_team_codes(user))
+def _has_members_permission(user, permission_key):
+    if not user:
+        return False
+    claims = user.claims_json or {}
+    return has_role_permission(claims.get('role_permissions') or {}, permission_key, 'members')
+
+
+def _has_members_manage_permission(user):
+    return (
+        _has_members_permission(user, 'create')
+        or _has_members_permission(user, 'write')
+        or _has_members_permission(user, 'update')
+        or _has_members_permission(user, 'delete')
+        or _has_members_permission(user, 'approve')
+    )
+
+
+def _can_view_members(user):
+    return _is_platform_admin(user) or _has_members_permission(user, 'read') or bool(_viewer_team_codes(user))
+
+
+def _can_edit_members(user):
+    return _is_platform_admin(user) or _has_members_manage_permission(user) or bool(_managed_team_codes(user))
 
 
 def _role_labels():

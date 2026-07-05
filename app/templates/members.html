@@ -13,8 +13,10 @@
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             {% if is_platform_admin %}
             Alle aktiven Benutzer sind sichtbar. Du kannst Team-Rollen und Zuordnungen direkt anpassen.
-            {% else %}
+            {% elif can_edit_members %}
             Hier siehst du die Benutzer aus deinen Teams und kannst ihre Rollen verwalten.
+            {% else %}
+            Hier siehst du die Benutzer aus deinen Teams im Lesemodus.
             {% endif %}
         </p>
     </div>
@@ -87,8 +89,8 @@
                 </td>
                 <td class="px-4 py-3">
                     <a href="{{ url_for('main.member_detail', target_user_id=user.id) }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition">
-                        <i class="bi bi-sliders"></i>
-                        Öffnen
+                        <i class="bi {{ 'bi-sliders' if can_edit_members else 'bi-eye' }}"></i>
+                        {{ 'Bearbeiten' if can_edit_members else 'Ansehen' }}
                     </a>
                 </td>
             </tr>

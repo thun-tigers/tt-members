@@ -2,7 +2,7 @@ from flask import Flask
 from flask import session
 from sqlalchemy import inspect, text
 
-from .authz import is_platform_admin, normalize_memberships, normalize_permissions
+from .authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
 from .config import Config
 from .extensions import db, limiter
 
@@ -31,6 +31,61 @@ def create_app(config_class=Config):
         }
 
     @app.context_processor
+    def inject_member_access_flags():
+        user_id = session.get('user_id')
+        if not user_id:
+            return {
+                'has_member_admin_access': False,
+                'has_member_edit_access': False,
+                'has_team_manager_access': False,
+            }
+
+        from .models import User
+        user = db.session.get(User, user_id)
+        if not user:
+            return {
+                'has_member_admin_access': False,
+                'has_member_edit_access': False,
+                'has_team_manager_access': False,
+            }
+
+        claims = user.claims_json or {}
+        permissions = normalize_permissions(claims.get('permissions'))
+        role_permissions = claims.get('role_permissions') or {}
+        memberships = normalize_memberships(claims.get('memberships'))
+        is_admin = is_platform_admin(user.platform_role, permissions)
+
+        active_roles = {
+            membership.get('member_role')
+            for membership in memberships
+            if membership.get('member_role')
+        }
+
+        has_member_admin_access = (
+            is_admin
+            or has_role_permission(role_permissions, 'read', 'members')
+            or bool(active_roles.intersection({'coach', 'head_coach', 'team_manager', 'team_betreuer'}))
+        )
+        has_member_edit_access = (
+            is_admin
+            or has_role_permission(role_permissions, 'create', 'members')
+            or has_role_permission(role_permissions, 'write', 'members')
+            or has_role_permission(role_permissions, 'approve', 'members')
+            or bool(active_roles.intersection({'head_coach', 'team_manager', 'team_betreuer'}))
+        )
+        has_team_manager_access = (
+            is_admin
+            or has_role_permission(role_permissions, 'approve', 'members')
+            or bool(active_roles.intersection({'head_coach', 'team_manager', 'team_betreuer'}))
+        )
+
+        return {
+            'has_member_admin_access': has_member_admin_access,
+            'has_member_edit_access': has_member_edit_access,
+            'has_team_manager_access': has_team_manager_access,
+        }
+
+    @app.context_processor
     def inject_pending_antraege_count():
         user_id = session.get('user_id')
         if not user_id:
@@ -43,7 +98,14 @@ def create_app(config_class=Config):
 
         claims = user.claims_json or {}
         permissions = normalize_permissions(claims.get('permissions'))
+        role_permissions = claims.get('role_permissions') or {}
         managed_team = is_platform_admin(user.platform_role, permissions)
+        if not managed_team:
+            managed_team = (
+                has_role_permission(role_permissions, 'create', 'members')
+                or has_role_permission(role_permissions, 'write', 'members')
+                or has_role_permission(role_permissions, 'approve', 'members')
+            )
         if not managed_team:
             memberships = normalize_memberships(claims.get('memberships'))
             managed_team = any(

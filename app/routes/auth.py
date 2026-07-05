@@ -93,6 +93,7 @@ def sso_login():
     session['profile_complete'] = user.profile_complete
     session['memberships'] = auth['memberships']
     session['permissions'] = auth['permissions']
+    session['role_permissions'] = auth['role_permissions']
     session['claims_json'] = claims
     session['nonce'] = secrets.token_hex(8)
 
