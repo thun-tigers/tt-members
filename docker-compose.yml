@@ -1,4 +1,19 @@
 services:
+  tt-postgres-members:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_MEMBERS_DB:-tt_members}
+      POSTGRES_USER: ${POSTGRES_MEMBERS_USER:-tt_members}
+      POSTGRES_PASSWORD: ${POSTGRES_MEMBERS_PASSWORD:-tt_members_password}
+    volumes:
+      - tt-members-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_MEMBERS_USER:-tt_members} -d ${POSTGRES_MEMBERS_DB:-tt_members}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   tt-members:
     build: .
     image: ghcr.io/swisi/tt-members:latest
@@ -8,7 +23,7 @@ services:
       - tt-members-data:/app/instance
     environment:
       - SECRET_KEY=${SECRET_KEY:-tt-members-dev-secret}
-      - SQLALCHEMY_DATABASE_URI=${SQLALCHEMY_DATABASE_URI:-sqlite:////app/instance/members.db}
+      - SQLALCHEMY_DATABASE_URI=${SQLALCHEMY_DATABASE_URI:-postgresql+psycopg://tt_members:tt_members_password@tt-postgres-members:5432/tt_members}
       - AUTH_BASE_URL=${AUTH_BASE_URL:-http://localhost:8085}
       - TT_AUTH_INTERNAL_URL=${TT_AUTH_INTERNAL_URL:-http://host.docker.internal:8085}
       - TT_INFRA_INTERNAL_URL=${TT_INFRA_INTERNAL_URL:-http://host.docker.internal:8084}
@@ -16,6 +31,9 @@ services:
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-tt-internal-dev-secret-change-me}
       - SSO_EXPECTED_AUDIENCE=tt-members
       - RATELIMIT_STORAGE_URI=memory://
+    depends_on:
+      tt-postgres-members:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/health').status == 200 else 1)\""]
       interval: 30s
@@ -26,3 +44,4 @@ services:
 
 volumes:
   tt-members-data:
+  tt-members-postgres-data:

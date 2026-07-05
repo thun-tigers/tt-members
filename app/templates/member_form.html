@@ -20,7 +20,7 @@
     </div>
 </div>
 
-<form method="POST" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<form method="POST" enctype="multipart/form-data" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <section class="lg:col-span-1 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700">
             <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Benutzerdaten</h2>
@@ -313,4 +313,52 @@
         </div>
     </section>
 </form>
+
+<section class="mt-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+        <div>
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Lizenzfoto</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Upload durch den Spieler, Freigabe durch Team-Manager, Head-Coach oder Admin.</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+            {{ license_photo_status_label(member_profile.license_photo_status if member_profile else 'none') }}
+        </span>
+    </div>
+    <div class="p-5 space-y-4">
+        {% if member_profile and member_profile.license_photo_filename %}
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <div class="text-sm font-semibold text-slate-900 dark:text-white">Vorhandenes Foto</div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">{{ member_profile.license_photo_uploaded_at or 'Kein Zeitstempel vorhanden' }}</p>
+            </div>
+            <a href="{{ url_for('main.license_photo_file', member_user_id=member_user.id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition">
+                <i class="bi bi-image"></i> Öffnen
+            </a>
+        </div>
+        {% endif %}
+        {% if member_profile and member_profile.license_photo_review_reason %}
+        <div class="rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
+            {{ member_profile.license_photo_review_reason }}
+        </div>
+        {% endif %}
+        <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-4 text-sm text-slate-600 dark:text-slate-300">
+            Der Upload erfolgt in der Profilansicht des Spielers. Hier sind nur Prüfung und Freigabe möglich.
+        </div>
+        {% if can_review_license_photo and member_profile and member_profile.license_photo_status in ['pending','rejected'] %}
+        <div class="flex flex-wrap items-center gap-2 pt-2">
+            <form method="POST" action="{{ url_for('main.approve_license_photo', target_user_id=member_user.auth_user_id) }}" class="inline-block">
+                <button type="submit" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition">
+                    <i class="bi bi-check2-circle"></i> Freigeben
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('main.reject_license_photo', target_user_id=member_user.auth_user_id) }}" class="inline-flex items-center gap-2">
+                <input type="text" name="reason" placeholder="Ablehnungsgrund" class="w-56 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm">
+                <button type="submit" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">
+                    <i class="bi bi-x-circle"></i> Zurückweisen
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+</section>
 {% endblock %}

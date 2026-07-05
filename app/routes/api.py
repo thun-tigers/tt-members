@@ -12,6 +12,24 @@ def _authorized():
     return bool(expected and provided and provided == expected)
 
 
+@bp.route('/internal/messages/count', methods=['GET'])
+def message_count():
+    if not _authorized():
+        return jsonify({'error': 'unauthorized'}), 401
+
+    auth_user_id = request.args.get('auth_user_id', type=int)
+    if not auth_user_id:
+        return jsonify({'error': 'auth_user_id_required'}), 400
+
+    user = User.query.filter_by(auth_user_id=auth_user_id).first()
+    if not user:
+        return jsonify({'pending_messages_count': 0}), 200
+
+    from .main import _message_items_for_user
+
+    return jsonify({'pending_messages_count': len(_message_items_for_user(user) or [])}), 200
+
+
 @bp.route('/internal/users/<int:auth_user_id>', methods=['DELETE'])
 def delete_user(auth_user_id):
     if not _authorized():

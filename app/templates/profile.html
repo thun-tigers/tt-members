@@ -49,7 +49,7 @@
     {% endif %}
 
     <!-- Form -->
-    <form method="POST" id="profileForm" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm divide-y divide-slate-100 dark:divide-slate-700">
+    <form method="POST" enctype="multipart/form-data" id="profileForm" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm divide-y divide-slate-100 dark:divide-slate-700">
 
         <div class="p-6 space-y-6">
             <div class="space-y-4">
@@ -169,6 +169,38 @@
                     <textarea name="notes" rows="3"
                         placeholder="Optionale Hinweise..."
                         class="block w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition resize-none">{{ profile.notes or '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Lizenzfoto</h2>
+                <div class="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-900 dark:text-white">Status: {{ license_photo_status_label(profile.license_photo_status if profile else 'none') }}</div>
+                            <p class="text-xs text-slate-500 dark:text-slate-400">Hochladen, damit Head-Coach, Team-Manager oder Admin die Aufnahme prüfen können.</p>
+                        </div>
+                        {% if profile and profile.license_photo_filename %}
+                        <a href="{{ url_for('main.license_photo_file', member_user_id=current_user.id) }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition">
+                            <i class="bi bi-image"></i> Öffnen
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% if profile and profile.license_photo_filename %}
+                    <a href="{{ url_for('main.license_photo_file', member_user_id=current_user.id) }}" target="_blank" class="block overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                        <img src="{{ url_for('main.license_photo_file', member_user_id=current_user.id) }}" alt="Lizenzfoto" class="h-56 w-full object-contain bg-slate-950/5 dark:bg-slate-950/30">
+                    </a>
+                    {% endif %}
+                    {% if profile and profile.license_photo_review_reason %}
+                    <div class="rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 px-3 py-2 text-sm text-rose-700 dark:text-rose-300">
+                        {{ profile.license_photo_review_reason }}
+                    </div>
+                    {% endif %}
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Neues Foto hochladen</label>
+                        <input type="file" name="license_photo" accept="image/jpeg,image/png,image/webp" class="block w-full text-sm text-slate-700 dark:text-slate-200 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-white hover:file:bg-indigo-700">
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Erlaubt sind JPG, PNG und WEBP.</p>
+                    </div>
                 </div>
             </div>
         </div>

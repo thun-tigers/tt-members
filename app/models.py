@@ -57,6 +57,12 @@ class MemberProfile(db.Model):
     jersey_number = db.Column(db.String(40), nullable=True)
     position = db.Column(db.String(80), nullable=True)
     shirt_size = db.Column(db.String(40), nullable=True)
+    license_photo_filename = db.Column(db.String(255), nullable=True)
+    license_photo_status = db.Column(db.String(20), nullable=False, default='none')
+    license_photo_review_reason = db.Column(db.Text, nullable=True)
+    license_photo_uploaded_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    license_photo_reviewed_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    license_photo_reviewed_by_user_id = db.Column(db.Integer, nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
     user = db.relationship('User', backref=db.backref('profile', uselist=False, cascade='all, delete-orphan'))

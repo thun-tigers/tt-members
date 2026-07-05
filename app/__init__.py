@@ -1,5 +1,6 @@
 from flask import Flask
 from flask import session
+from pathlib import Path
 from sqlalchemy import inspect, text
 
 from .authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
@@ -116,11 +117,15 @@ def create_app(config_class=Config):
             return {'pending_antraege_count': 0}
 
         try:
-            from .routes.main import _fetch_pending_users_for_manager
-            pending_users, _ = _fetch_pending_users_for_manager(user)
-            return {'pending_antraege_count': len(pending_users or [])}
+            from .routes.main import _message_items_for_user
+            message_items = _message_items_for_user(user)
+            return {
+                'pending_antraege_count': len(message_items or []),
+                'pending_messages_count': len(message_items or []),
+                'message_items': message_items or [],
+            }
         except Exception:
-            return {'pending_antraege_count': 0}
+            return {'pending_antraege_count': 0, 'pending_messages_count': 0, 'message_items': []}
 
     with app.app_context():
         db.create_all()
@@ -155,6 +160,21 @@ def create_app(config_class=Config):
                 db.session.execute(text('ALTER TABLE member_profile ADD COLUMN position VARCHAR(80)'))
             if 'shirt_size' not in columns:
                 db.session.execute(text('ALTER TABLE member_profile ADD COLUMN shirt_size VARCHAR(40)'))
+            if 'license_photo_filename' not in columns:
+                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_filename VARCHAR(255)'))
+            if 'license_photo_status' not in columns:
+                db.session.execute(text("ALTER TABLE member_profile ADD COLUMN license_photo_status VARCHAR(20) NOT NULL DEFAULT 'none'"))
+            if 'license_photo_review_reason' not in columns:
+                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_review_reason TEXT'))
+            if 'license_photo_uploaded_at' not in columns:
+                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_uploaded_at TIMESTAMP'))
+            if 'license_photo_reviewed_at' not in columns:
+                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_reviewed_at TIMESTAMP'))
+            if 'license_photo_reviewed_by_user_id' not in columns:
+                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_reviewed_by_user_id INTEGER'))
             db.session.commit()
+
+        upload_root = Path(app.config.get('UPLOAD_ROOT', str(Path('instance') / 'uploads')))
+        (upload_root / 'license-photos').mkdir(parents=True, exist_ok=True)
 
     return app

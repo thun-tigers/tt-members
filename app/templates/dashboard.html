@@ -11,9 +11,50 @@
     </div>
     <div>
         <h1 class="text-2xl font-bold">{{ current_user.display_name or current_user.username }}</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Hier siehst du, was bereits freigegeben ist und was noch auf Freigabe wartet.</p>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Hier siehst du deine Messages, Team-Rollen und den Status deines Lizenzfotos.</p>
     </div>
 </div>
+
+<div class="mb-6 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3">
+        <div>
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Messages</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Offene Aufgaben und Hinweise für dich.</p>
+        </div>
+        <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{{ message_items|length if message_items else 0 }} offen</span>
+    </div>
+    <div class="p-6 space-y-3">
+        {% if message_items %}
+        {% for item in message_items[:3] %}
+        <div class="rounded-xl border px-4 py-3 {% if item.severity == 'danger' %}border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20{% elif item.severity == 'warning' %}border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20{% else %}border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50{% endif %}">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <div class="font-semibold text-slate-900 dark:text-white">{{ item.title }}</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-300 mt-1">{{ item.message }}</div>
+                </div>
+                {% if item.action_url and item.action_label %}
+                <a href="{{ item.action_url }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition">{{ item.action_label }}</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-sm text-slate-500 dark:text-slate-400">Aktuell sind keine offenen Messages vorhanden.</div>
+        {% endif %}
+    </div>
+</div>
+
+{% if current_user.profile and current_user.profile.license_photo_status == 'rejected' %}
+<div class="mb-6 rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-900/20 p-5 shadow-sm">
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <div class="text-sm font-semibold text-rose-800 dark:text-rose-200">Dein Lizenzfoto wurde zurückgewiesen</div>
+            <div class="text-sm text-rose-700 dark:text-rose-300 mt-1">{{ current_user.profile.license_photo_review_reason or 'Bitte lade ein neues Foto hoch.' }}</div>
+        </div>
+        <a href="{{ url_for('main.profile') }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">Foto ersetzen</a>
+    </div>
+</div>
+{% endif %}
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Stammdaten -->
@@ -94,8 +135,8 @@
         {% if current_user.platform_role == 'admin' or manager_memberships %}
             <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                 <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5 text-sm text-blue-800 dark:text-blue-300">
-                    <div class="font-semibold">{% if current_user.platform_role == 'admin' %}Plattform-Admin mit Vollzugriff{% else %}Antrags-Rechte erkannt{% endif %}</div>
-                    <div class="text-xs mt-1">Offene Team-Anfragen findest du oben im Menü unter <strong>Anfragen</strong>.</div>
+                    <div class="font-semibold">{% if current_user.platform_role == 'admin' %}Plattform-Admin mit Vollzugriff{% else %}Messages-Rechte erkannt{% endif %}</div>
+                    <div class="text-xs mt-1">Offene Aufgaben findest du oben im Menü unter <strong>Messages</strong>.</div>
                 </div>
             </div>
             {% endif %}

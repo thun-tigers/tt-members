@@ -1,9 +1,12 @@
 from functools import wraps
-from datetime import date
+from datetime import date, datetime, timezone
+from pathlib import Path
 import re
+from uuid import uuid4
 
 import requests
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for, send_file, abort
+from werkzeug.utils import secure_filename
 
 from ..authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
 from ..extensions import db
@@ -26,6 +29,238 @@ def current_user():
     return db.session.get(User, user_id) if user_id else None
 
 
+ALLOWED_LICENSE_PHOTO_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+LICENSE_PHOTO_STATUSES = {'none', 'pending', 'approved', 'rejected'}
+
+
+def _license_photo_storage_dir():
+    root = Path(current_app.config.get('UPLOAD_ROOT', str(Path('instance') / 'uploads')))
+    directory = root / 'license-photos'
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _safe_license_photo_extension(filename):
+    suffix = Path(filename or '').suffix.lower()
+    return suffix if suffix in ALLOWED_LICENSE_PHOTO_EXTENSIONS else ''
+
+
+def _remove_license_photo_file(filename):
+    if not filename:
+        return
+    file_path = _license_photo_storage_dir() / filename
+    try:
+        file_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _store_license_photo_upload(profile, upload_file):
+    if not upload_file or not upload_file.filename:
+        return False, 'Bitte ein Lizenzfoto auswählen.'
+
+    extension = _safe_license_photo_extension(upload_file.filename)
+    if not extension:
+        return False, 'Erlaubt sind nur JPG, PNG oder WEBP.'
+
+    original_name = secure_filename(upload_file.filename)
+    photo_filename = f'license_{profile.user_id}_{uuid4().hex}{extension}'
+    destination = _license_photo_storage_dir() / photo_filename
+
+    old_filename = profile.license_photo_filename
+    upload_file.save(destination)
+    if old_filename and old_filename != photo_filename:
+        _remove_license_photo_file(old_filename)
+
+    profile.license_photo_filename = photo_filename
+    profile.license_photo_status = 'pending'
+    profile.license_photo_review_reason = None
+    profile.license_photo_uploaded_at = datetime.now(timezone.utc)
+    profile.license_photo_reviewed_at = None
+    profile.license_photo_reviewed_by_user_id = None
+    return True, None
+
+
+def _can_review_license_photo(user):
+    if not user:
+        return False
+    if _is_platform_admin(user):
+        return True
+    memberships = normalize_memberships((user.claims_json or {}).get('memberships'))
+    return any(
+        membership.get('is_active', True) and membership.get('member_role') in {'head_coach', 'team_manager'}
+        for membership in memberships
+    )
+
+
+def _license_photo_status_label(status):
+    return {
+        'none': 'Kein Foto',
+        'pending': 'In Prüfung',
+        'approved': 'Freigegeben',
+        'rejected': 'Zurückgewiesen',
+    }.get((status or 'none').lower(), 'Unbekannt')
+
+
+def _personal_message_items(user):
+    items = []
+    profile = db.session.query(MemberProfile).filter_by(user_id=user.id).first() if user else None
+
+    if profile and profile.license_photo_status == 'pending':
+        items.append({
+            'kind': 'license_photo',
+            'severity': 'warning',
+            'title': 'Dein Lizenzfoto ist in Prüfung',
+            'message': 'Ein Berechtigter prüft dein Foto gerade.',
+            'action_label': 'Profil öffnen',
+            'action_url': url_for('main.profile'),
+        })
+    elif profile and profile.license_photo_status == 'rejected':
+        items.append({
+            'kind': 'license_photo',
+            'severity': 'danger',
+            'title': 'Dein Lizenzfoto wurde zurückgewiesen',
+            'message': profile.license_photo_review_reason or 'Bitte lade ein neues Foto hoch.',
+            'action_label': 'Foto ersetzen',
+            'action_url': url_for('main.profile'),
+        })
+
+    pending_memberships = normalize_memberships((user.claims_json or {}).get('pending_memberships')) if user else []
+    for membership in pending_memberships:
+        items.append({
+            'kind': 'membership',
+            'severity': 'info',
+            'title': 'Deine Team-Anfrage ist offen',
+            'message': f"{membership.get('team_name') or membership.get('team_code')}: {membership.get('member_role')}",
+            'action_label': None,
+            'action_url': None,
+        })
+
+    return items
+
+
+def _manager_message_items(user):
+    if not _can_review_license_photo(user):
+        return []
+
+    items = []
+    pending_users, _ = _fetch_pending_users_for_manager(user)
+    pending_license_photos, _ = _fetch_pending_license_photos_for_manager(user)
+
+    for pending_user in pending_users or []:
+        items.append({
+            'kind': 'team_request',
+            'severity': 'info',
+            'title': 'Neue Team-Anfrage',
+            'message': pending_user.get('display_name') or pending_user.get('username') or 'Unbekannt',
+            'action_label': 'Messages öffnen',
+            'action_url': url_for('main.messages'),
+        })
+
+    for photo in pending_license_photos or []:
+        items.append({
+            'kind': 'license_review',
+            'severity': 'warning',
+            'title': 'Lizenzfoto wartet auf Prüfung',
+            'message': photo.get('display_name') or photo.get('username') or 'Unbekannt',
+            'action_label': 'Foto prüfen',
+            'action_url': url_for('main.messages'),
+        })
+
+    return items
+
+
+def _message_items_for_user(user):
+    if not user:
+        return []
+    items = _personal_message_items(user)
+    items.extend(_manager_message_items(user))
+    return items
+
+
+def _member_display_name(user, profile=None):
+    if profile:
+        full_name = ' '.join(part for part in (profile.first_name, profile.last_name) if part)
+        if full_name:
+            return full_name
+    if user:
+        return user.display_name or user.username
+    return 'Unbekannt'
+
+
+def _fetch_pending_license_photos_for_manager(user):
+    if not _can_review_license_photo(user):
+        return [], None
+
+    query = (
+        db.session.query(MemberProfile, User)
+        .join(User, User.id == MemberProfile.user_id)
+        .filter(MemberProfile.license_photo_status == 'pending')
+        .order_by(MemberProfile.license_photo_uploaded_at.asc().nullslast(), User.display_name.asc(), User.username.asc())
+    )
+    items = []
+    managed_team_codes = set(_managed_team_codes(user)) if not _is_platform_admin(user) else set()
+
+    for profile, member_user in query.all():
+        if managed_team_codes:
+            memberships = normalize_memberships((member_user.claims_json or {}).get('memberships'))
+            visible = any(
+                (membership.get('team_code') or '').strip().upper() in managed_team_codes
+                for membership in memberships
+                if membership.get('team_code')
+            )
+            if not visible:
+                continue
+
+        items.append({
+            'member_user_id': member_user.id,
+            'auth_user_id': member_user.auth_user_id,
+            'username': member_user.username,
+            'display_name': _member_display_name(member_user, profile),
+            'email': profile.email or member_user.email,
+            'uploaded_at': profile.license_photo_uploaded_at,
+            'review_reason': profile.license_photo_review_reason,
+            'status': profile.license_photo_status,
+            'license_photo_filename': profile.license_photo_filename,
+        })
+
+    return items, None
+
+
+def _member_profile_for_auth_user_id(target_user_id):
+    member_user = db.session.query(User).filter_by(auth_user_id=target_user_id).first()
+    if not member_user:
+        return None, None
+    profile = db.session.query(MemberProfile).filter_by(user_id=member_user.id).first()
+    return member_user, profile
+
+
+@bp.route('/members/<int:member_user_id>/license-photo')
+@login_required
+def license_photo_file(member_user_id):
+    user = current_user()
+    if not user:
+        abort(403)
+
+    member_user = db.session.get(User, member_user_id)
+    if not member_user:
+        abort(404)
+
+    if user.id != member_user_id and not (_can_review_license_photo(user) or _can_view_members(user)):
+        abort(403)
+
+    profile = db.session.query(MemberProfile).filter_by(user_id=member_user_id).first()
+    if not profile or not profile.license_photo_filename:
+        abort(404)
+
+    photo_path = (_license_photo_storage_dir() / profile.license_photo_filename).resolve()
+    if not photo_path.exists() or not photo_path.is_file():
+        current_app.logger.warning('license photo missing on disk: %s', photo_path)
+        abort(404)
+
+    return send_file(photo_path)
+
+
 @bp.route('/health')
 def health():
     return {'status': 'ok'}, 200
@@ -40,19 +275,21 @@ def index():
     return render_template('dashboard.html', current_user=user)
 
 
-@bp.route('/antraege', endpoint='antraege')
+@bp.route('/messages')
 @login_required
-def antraege():
+def messages():
     user = current_user()
     is_platform_admin = _is_platform_admin(user)
     managed_team_codes = _managed_team_codes(user)
-    if not is_platform_admin and not _has_members_manage_permission(user) and not managed_team_codes:
-        flash('Kein Team-Manager-Zugriff vorhanden.', 'danger')
-        return redirect(url_for('main.index'))
-
-    pending_users, fetch_error = _fetch_pending_users_for_manager(user)
-    if fetch_error:
-        flash(fetch_error, 'danger')
+    pending_users = []
+    pending_license_photos = []
+    if is_platform_admin or _has_members_manage_permission(user) or managed_team_codes:
+        pending_users, fetch_error = _fetch_pending_users_for_manager(user)
+        pending_license_photos, photo_error = _fetch_pending_license_photos_for_manager(user)
+        if fetch_error:
+            flash(fetch_error, 'danger')
+        if photo_error:
+            flash(photo_error, 'danger')
 
     return render_template(
         'team_manager.html',
@@ -60,7 +297,15 @@ def antraege():
         is_platform_admin=is_platform_admin,
         managed_team_codes=managed_team_codes,
         pending_users=pending_users,
+        pending_license_photos=pending_license_photos,
+        message_items=_message_items_for_user(user),
     )
+
+
+@bp.route('/antraege')
+@login_required
+def antraege():
+    return redirect(url_for('main.messages'))
 
 
 @bp.route('/members')
@@ -152,6 +397,7 @@ def member_detail(target_user_id):
             'jersey_number': (request.form.get('jersey_number') or '').strip() or None,
             'position': (request.form.get('position') or '').strip() or None,
         }
+        license_photo = request.files.get('license_photo')
         required_errors = _required_profile_errors({
             'first_name': first_name,
             'last_name': last_name,
@@ -168,6 +414,13 @@ def member_detail(target_user_id):
             ok, error = _update_user_profile_via_auth(user, local_target_user.auth_user_id, profile_fields)
             if ok:
                 _update_member_profile_fields(local_target_user.id, profile_fields)
+                profile = db.session.query(MemberProfile).filter_by(user_id=local_target_user.id).first()
+                if license_photo and license_photo.filename and profile:
+                    ok_photo, photo_error = _store_license_photo_upload(profile, license_photo)
+                    if not ok_photo:
+                        db.session.rollback()
+                        flash(photo_error or 'Lizenzfoto konnte nicht gespeichert werden.', 'danger')
+                        return redirect(url_for('main.member_detail', target_user_id=target_user_id))
                 ok, error = _update_member_memberships(user, target_user_id, selected_memberships)
                 if ok:
                     db.session.commit()
@@ -194,6 +447,8 @@ def member_detail(target_user_id):
         member_user=local_target_user,
         position_options=position_options,
         position_labels=position_labels,
+        can_review_license_photo=_can_review_license_photo(user),
+        license_photo_status_label=_license_photo_status_label,
         team_roles={
             int(team_id): (roles if isinstance(roles, list) else ([roles] if roles else []))
             for team_id, roles in (payload.get('user', {}).get('team_roles') or {}).items()
@@ -247,7 +502,7 @@ def submitted():
 @login_required
 def profile():
     user = current_user()
-    profile = user.profile
+    profile = db.session.query(MemberProfile).filter_by(user_id=user.id).first()
     position_options = _fetch_position_options()
     position_labels = {item['key']: item['label'] for item in position_options}
     if request.method == 'POST':
@@ -263,6 +518,7 @@ def profile():
         nationality = (request.form.get('nationality') or '').strip() or None
         shirt_size = (request.form.get('shirt_size') or '').strip() or None
         notes = (request.form.get('notes') or '').strip() or None
+        license_photo = request.files.get('license_photo')
 
         required_errors = _required_profile_errors({
             'first_name': first_name,
@@ -300,6 +556,13 @@ def profile():
                 flash(error or 'Die Profildaten konnten nicht gespeichert werden.', 'danger')
             else:
                 _update_member_profile_fields(user.id, profile_fields)
+                profile = db.session.query(MemberProfile).filter_by(user_id=user.id).first()
+                if license_photo and license_photo.filename and profile:
+                    ok_photo, photo_error = _store_license_photo_upload(profile, license_photo)
+                    if not ok_photo:
+                        db.session.rollback()
+                        flash(photo_error or 'Lizenzfoto konnte nicht gespeichert werden.', 'danger')
+                        return redirect(url_for('main.profile'))
                 db.session.commit()
                 if already_complete:
                     flash('Profil erfolgreich aktualisiert.', 'success')
@@ -318,7 +581,54 @@ def profile():
         initial_last_name=profile.last_name if profile else (user.last_name or ''),
         initial_email=profile.email if profile and profile.email is not None else (user.email or ''),
         position_labels=position_labels,
+        can_review_license_photo=_can_review_license_photo(user),
+        license_photo_status_label=_license_photo_status_label,
     )
+
+
+@bp.route('/members/<int:target_user_id>/license-photo/approve', methods=['POST'])
+@login_required
+def approve_license_photo(target_user_id):
+    user = current_user()
+    if not _can_review_license_photo(user):
+        flash('Keine Berechtigung für diese Freigabe.', 'danger')
+        return redirect(url_for('main.member_detail', target_user_id=target_user_id))
+
+    member_user, profile = _member_profile_for_auth_user_id(target_user_id)
+    if not member_user or not profile or profile.license_photo_status == 'none':
+        flash('Kein Lizenzfoto vorhanden.', 'warning')
+        return redirect(url_for('main.member_detail', target_user_id=target_user_id))
+
+    profile.license_photo_status = 'approved'
+    profile.license_photo_review_reason = None
+    profile.license_photo_reviewed_at = datetime.now(timezone.utc)
+    profile.license_photo_reviewed_by_user_id = user.id
+    db.session.commit()
+    flash('Lizenzfoto freigegeben.', 'success')
+    return redirect(url_for('main.member_detail', target_user_id=target_user_id))
+
+
+@bp.route('/members/<int:target_user_id>/license-photo/reject', methods=['POST'])
+@login_required
+def reject_license_photo(target_user_id):
+    user = current_user()
+    if not _can_review_license_photo(user):
+        flash('Keine Berechtigung für diese Ablehnung.', 'danger')
+        return redirect(url_for('main.member_detail', target_user_id=target_user_id))
+
+    reason = (request.form.get('reason') or '').strip() or None
+    member_user, profile = _member_profile_for_auth_user_id(target_user_id)
+    if not member_user or not profile or profile.license_photo_status == 'none':
+        flash('Kein Lizenzfoto vorhanden.', 'warning')
+        return redirect(url_for('main.member_detail', target_user_id=target_user_id))
+
+    profile.license_photo_status = 'rejected'
+    profile.license_photo_review_reason = reason
+    profile.license_photo_reviewed_at = datetime.now(timezone.utc)
+    profile.license_photo_reviewed_by_user_id = user.id
+    db.session.commit()
+    flash('Lizenzfoto zurückgewiesen.', 'success')
+    return redirect(url_for('main.member_detail', target_user_id=target_user_id))
 
 
 def _notify_auth_profile_complete(auth_user_id):

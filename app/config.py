@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
 
@@ -9,7 +10,7 @@ class Config:
     SQLALCHEMY_DATABASE_URI = (
         os.environ.get('SQLALCHEMY_DATABASE_URI')
         or os.environ.get('DATABASE_URL')
-        or 'sqlite:///members.db'
+        or 'postgresql+psycopg://tt_members:tt_members_password@tt-postgres-members:5432/tt_members'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     AUTH_BASE_URL = os.environ.get('AUTH_BASE_URL', 'http://localhost:8085')
@@ -19,3 +20,4 @@ class Config:
     INTERNAL_API_SECRET = os.environ.get('INTERNAL_API_SECRET', 'tt-internal-dev-secret-change-me')
     TT_AUTH_INTERNAL_URL = os.environ.get('TT_AUTH_INTERNAL_URL', 'http://tt-auth:5000')
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
+    UPLOAD_ROOT = os.environ.get('UPLOAD_ROOT', str(Path('instance') / 'uploads'))
