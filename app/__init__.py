@@ -2,6 +2,7 @@ from flask import Flask
 from flask import session
 from pathlib import Path
 from sqlalchemy import inspect, text
+import logging
 
 from .authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
 from .config import Config
@@ -11,6 +12,21 @@ from .extensions import db, limiter
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Logging
+    log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO').upper(), logging.INFO)
+    formatter = logging.Formatter('[%(asctime)s +0000] [%(process)d] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
+    root_logger.setLevel(log_level)
+
+    # Flask session config
+    app.config.setdefault('SESSION_COOKIE_SECURE', True)
+    app.config.setdefault('SESSION_COOKIE_HTTPONLY', True)
+    app.config.setdefault('SESSION_COOKIE_SAMESITE', 'Lax')
 
     db.init_app(app)
     limiter.init_app(app)
