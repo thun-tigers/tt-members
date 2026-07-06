@@ -13,6 +13,7 @@ class Config:
         or 'postgresql+psycopg://tt_members:tt_members_password@tt-postgres-members:5432/tt_members'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
     AUTH_BASE_URL = os.environ.get('AUTH_BASE_URL', 'http://localhost:8085')
     TT_INFRA_INTERNAL_URL = os.environ.get('TT_INFRA_INTERNAL_URL', 'http://localhost:8084')
     SSO_SHARED_SECRET = os.environ.get('SSO_SHARED_SECRET') or SECRET_KEY

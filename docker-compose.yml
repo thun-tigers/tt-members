@@ -24,6 +24,7 @@ services:
     environment:
       - SECRET_KEY=${SECRET_KEY:-tt-members-dev-secret}
       - SQLALCHEMY_DATABASE_URI=${SQLALCHEMY_DATABASE_URI:-postgresql+psycopg://tt_members:tt_members_password@tt-postgres-members:5432/tt_members}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - AUTH_BASE_URL=${AUTH_BASE_URL:-http://localhost:8085}
       - TT_AUTH_INTERNAL_URL=${TT_AUTH_INTERNAL_URL:-http://host.docker.internal:8085}
       - TT_INFRA_INTERNAL_URL=${TT_INFRA_INTERNAL_URL:-http://host.docker.internal:8084}
