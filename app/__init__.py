@@ -39,6 +39,17 @@ def create_app(config_class=Config):
     app.register_blueprint(main_bp)
     app.register_blueprint(api_bp)
 
+    # Zentrales UI-Layout aus tt-common
+    from tt_common import register_shared_ui
+    register_shared_ui(
+        app,
+        brand_label='Members',
+        brand_icon='bi-people-fill',
+        home_endpoint='main.index',
+        profile_endpoint='main.profile',
+        logout_endpoint='auth.logout',
+    )
+
     @app.context_processor
     def inject_platform_links():
         auth_base_url = app.config.get('AUTH_BASE_URL', 'http://localhost:8085').rstrip('/')
@@ -106,12 +117,12 @@ def create_app(config_class=Config):
     def inject_pending_antraege_count():
         user_id = session.get('user_id')
         if not user_id:
-            return {'pending_antraege_count': 0}
+            return {'pending_antraege_count': 0, 'pending_messages_count': 0, 'message_items': []}
 
         from .models import User
         user = db.session.get(User, user_id)
         if not user:
-            return {'pending_antraege_count': 0}
+            return {'pending_antraege_count': 0, 'pending_messages_count': 0, 'message_items': []}
 
         claims = user.claims_json or {}
         permissions = normalize_permissions(claims.get('permissions'))
@@ -130,7 +141,7 @@ def create_app(config_class=Config):
                 for membership in memberships
             )
         if not managed_team:
-            return {'pending_antraege_count': 0}
+            return {'pending_antraege_count': 0, 'pending_messages_count': 0, 'message_items': []}
 
         try:
             from .routes.main import _message_items_for_user

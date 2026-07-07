@@ -22,18 +22,20 @@
     </div>
 </div>
 
-<form method="GET" class="mb-6 flex flex-col sm:flex-row gap-3">
-    <input
-        type="search"
-        name="q"
-        value="{{ query }}"
-        placeholder="Nach Benutzer, Name oder E-Mail suchen"
-        class="w-full sm:max-w-xl px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
-    >
-    <button type="submit" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition">
-        <i class="bi bi-search"></i>
-        Suchen
-    </button>
+<form method="GET" class="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end">
+    <div class="relative w-full lg:max-w-md lg:ml-auto">
+        <input
+            type="search"
+            name="q"
+            value="{{ query }}"
+            placeholder="Nach Benutzer, Name oder E-Mail suchen"
+            class="block w-full h-10 px-4 pr-10 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        >
+        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <i class="bi bi-search"></i>
+        </span>
+    </div>
+    <button type="submit" class="hidden" aria-hidden="true" tabindex="-1">Suchen</button>
 </form>
 
 <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">

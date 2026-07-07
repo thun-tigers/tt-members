@@ -1,38 +1,21 @@
 import secrets
-from urllib.parse import urlencode, urljoin, urlparse
 
 import jwt
 from flask import Blueprint, current_app, flash, redirect, request, session, url_for
 
+from tt_common.sso import get_auth_login_url, get_auth_logout_url, is_safe_url
+
 from ..authz import normalize_auth_payload
 from ..extensions import db, limiter
 from ..models import User
+from ..sso_replay import is_replayed_sso_token
 
 bp = Blueprint('auth', __name__)
 
 
-def is_safe_url(target):
-    ref_url = urlparse(request.host_url)
-    test_url = urlparse(urljoin(request.host_url, target))
-    return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
-
-
-def get_auth_login_url(next_page=None):
-    auth_base_url = current_app.config.get('AUTH_BASE_URL', 'http://localhost:8085').rstrip('/')
-    query = {'next_service': 'tt-members'}
-    if next_page:
-        query['next'] = next_page
-    return f"{auth_base_url}/?{urlencode(query)}"
-
-
 @bp.route('/login')
 def login():
-    return redirect(get_auth_login_url(request.args.get('next')))
-
-
-def get_auth_logout_url():
-    auth_base_url = current_app.config.get('AUTH_BASE_URL', 'http://localhost:8085').rstrip('/')
-    return f"{auth_base_url}/logout"
+    return redirect(get_auth_login_url('tt-members', request.args.get('next')))
 
 
 @bp.route('/logout', methods=['POST'])
@@ -61,6 +44,10 @@ def sso_login():
         return redirect(url_for('auth.login'))
     except jwt.InvalidTokenError:
         flash('Ungültiger SSO-Token.', 'danger')
+        return redirect(url_for('auth.login'))
+
+    if is_replayed_sso_token(payload):
+        flash('SSO-Token wurde bereits verwendet. Bitte erneut anmelden.', 'danger')
         return redirect(url_for('auth.login'))
 
     auth = normalize_auth_payload(payload)

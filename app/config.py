@@ -18,6 +18,8 @@ class Config:
     TT_INFRA_INTERNAL_URL = os.environ.get('TT_INFRA_INTERNAL_URL', 'http://localhost:8084')
     SSO_SHARED_SECRET = os.environ.get('SSO_SHARED_SECRET') or SECRET_KEY
     SSO_EXPECTED_AUDIENCE = os.environ.get('SSO_EXPECTED_AUDIENCE', 'tt-members')
+    SSO_REPLAY_STORAGE_URI = os.environ.get('SSO_REPLAY_STORAGE_URI', '')
+    SSO_REPLAY_TTL_SECONDS = int(os.environ.get('SSO_REPLAY_TTL_SECONDS', 300))
     INTERNAL_API_SECRET = os.environ.get('INTERNAL_API_SECRET', 'tt-internal-dev-secret-change-me')
     TT_AUTH_INTERNAL_URL = os.environ.get('TT_AUTH_INTERNAL_URL', 'http://tt-auth:5000')
     RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
