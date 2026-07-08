@@ -4,6 +4,7 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 import logging
 
+from werkzeug.middleware.proxy_fix import ProxyFix
 from .authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
 from .config import Config
 from .extensions import db, limiter
@@ -204,4 +205,5 @@ def create_app(config_class=Config):
         upload_root = Path(app.config.get('UPLOAD_ROOT', str(Path('instance') / 'uploads')))
         (upload_root / 'license-photos').mkdir(parents=True, exist_ok=True)
 
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     return app
