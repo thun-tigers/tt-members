@@ -49,7 +49,7 @@
     <div class="h-8 w-8 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white font-bold text-xs">{{ (current_user.display_name or current_user.username)[0].upper() }}</div>
   </a>
   <form method="POST" action="{{ url_for('auth.logout') }}">
-    <button type="submit" class="h-8 w-8 grid place-items-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition" title="Abmelden">
+    <button type="submit" class="h-11 w-11 lg:h-8 lg:w-8 grid place-items-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition" title="Abmelden" aria-label="Abmelden">
       <i class="bi bi-box-arrow-right"></i>
     </button>
   </form>
