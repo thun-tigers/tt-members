@@ -316,8 +316,7 @@ def members():
         flash('Kein Zugriff auf die Mitgliederverwaltung.', 'danger')
         return redirect(url_for('main.index'))
 
-    query = (request.args.get('q') or '').strip()
-    payload, error = _fetch_members_for_manager(user, query=query)
+    payload, error = _fetch_members_for_manager(user)
     if error:
         flash(error, 'danger')
         payload = {'teams': [], 'users': [], 'is_platform_admin': _is_platform_admin(user)}
@@ -331,7 +330,6 @@ def members():
         if local_users:
             local_ids = [u.id for u in local_users]
             profiles = db.session.query(MemberProfile).filter(MemberProfile.user_id.in_(local_ids)).all()
-            local_by_id = {u.id: u for u in local_users}
             profiles_by_local_id = {p.user_id: p for p in profiles}
             for lu in local_users:
                 p = profiles_by_local_id.get(lu.id)
@@ -345,7 +343,6 @@ def members():
         teams=payload.get('teams', []),
         users=raw_users,
         is_platform_admin=payload.get('is_platform_admin', False),
-        query=query,
         role_labels=_role_labels(),
         can_edit_members=_can_edit_members(user),
     )
@@ -810,11 +807,11 @@ def _auth_internal_request(method, path, *, params=None, json=None):
         return None, 'Mitgliedsdaten konnten nicht geladen werden.'
 
 
-def _fetch_members_for_manager(user, query=''):
+def _fetch_members_for_manager(user):
     response, error = _auth_internal_request(
         'GET',
         '/api/team-manager/members',
-        params={'approver_auth_user_id': user.auth_user_id, 'q': query or None},
+        params={'approver_auth_user_id': user.auth_user_id},
     )
     if error:
         return None, error
