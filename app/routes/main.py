@@ -270,6 +270,8 @@ def health():
 @login_required
 def index():
     user = current_user()
+    if _can_view_members(user):
+        return redirect(url_for('main.members'))
     if not user.profile_complete or not user.profile:
         return redirect(url_for('main.profile'))
     return render_template('dashboard.html', current_user=user)
