@@ -322,11 +322,28 @@ def members():
         flash(error, 'danger')
         payload = {'teams': [], 'users': [], 'is_platform_admin': _is_platform_admin(user)}
 
+    # Enrich users with position from local member_profile
+    raw_users = payload.get('users', [])
+    if raw_users:
+        auth_ids = [u['id'] for u in raw_users if u.get('id')]
+        local_users = db.session.query(User).filter(User.auth_user_id.in_(auth_ids)).all()
+        profiles_by_auth_id = {}
+        if local_users:
+            local_ids = [u.id for u in local_users]
+            profiles = db.session.query(MemberProfile).filter(MemberProfile.user_id.in_(local_ids)).all()
+            local_by_id = {u.id: u for u in local_users}
+            profiles_by_local_id = {p.user_id: p for p in profiles}
+            for lu in local_users:
+                p = profiles_by_local_id.get(lu.id)
+                profiles_by_auth_id[lu.auth_user_id] = {'position': p.position if p else None}
+        for u in raw_users:
+            u['profile'] = profiles_by_auth_id.get(u.get('id'), {'position': None})
+
     return render_template(
         'members.html',
         current_user=user,
         teams=payload.get('teams', []),
-        users=payload.get('users', []),
+        users=raw_users,
         is_platform_admin=payload.get('is_platform_admin', False),
         query=query,
         role_labels=_role_labels(),

@@ -45,6 +45,7 @@
             <tr>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Benutzer</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Teams</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 hidden md:table-cell">Position</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 hidden md:table-cell">Status</th>
                 <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Aktion</th>
             </tr>
@@ -79,6 +80,15 @@
                         </span>
                         {% endfor %}
                     </div>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                    {% if user.profile and user.profile.position %}
+                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                        {{ user.profile.position }}
+                    </span>
+                    {% else %}
+                    <span class="text-xs text-slate-400 dark:text-slate-500">–</span>
                     {% endif %}
                 </td>
                 <td class="px-4 py-3 hidden md:table-cell">
