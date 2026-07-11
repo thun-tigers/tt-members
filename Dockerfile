@@ -1,14 +1,10 @@
-FROM python:3.12-slim
+ARG TT_COMMON_TAG=latest
+FROM ghcr.io/thun-tigers/tt-common:${TT_COMMON_TAG}
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN apt-get update && apt-get install -y \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-ARG TT_COMMON_REF=v0.1.17
-RUN sed -i "s#@v[0-9][0-9.]*#@${TT_COMMON_REF}#" requirements.txt \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
