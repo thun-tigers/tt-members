@@ -339,6 +339,13 @@ def members():
         for u in raw_users:
             u['profile'] = profiles_by_auth_id.get(u.get('id'), {'position': None})
 
+    visible_teams = sorted({
+        (m.get('team', {}).get('code') or '').strip().upper()
+        for u in raw_users
+        for m in (u.get('active_memberships') or [])
+        if (m.get('team', {}).get('code') or '').strip()
+    })
+
     return render_template(
         'members.html',
         current_user=user,
@@ -347,6 +354,7 @@ def members():
         is_platform_admin=payload.get('is_platform_admin', False),
         role_labels=_role_labels(),
         can_edit_members=_can_edit_members(user),
+        visible_teams=visible_teams,
     )
 
 
