@@ -259,6 +259,10 @@
                                 {% endif %}
                             </div>
                         </div>
+                        <div class="grid grid-cols-2 gap-2 mt-3">
+                            <label class="text-xs text-slate-500">Gültig ab<input type="date" name="team_{{ team.id }}_valid_from" value="{{ (user_payload.active_memberships[0].valid_from if user_payload.active_memberships else '') or '' }}" class="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"></label>
+                            <label class="text-xs text-slate-500">Gültig bis<input type="date" name="team_{{ team.id }}_valid_to" class="mt-1 w-full rounded-lg border px-2 py-1.5 text-sm"></label>
+                        </div>
                         <div class="space-y-2">
                             {% for role_key, role_label in role_labels.items() if role_key != 'none' %}
                             <label class="flex items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm">

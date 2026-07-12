@@ -390,7 +390,12 @@ def member_detail(target_user_id):
             except ValueError:
                 continue
             role_key = match.group(2)
-            selected_memberships.append({'team_id': team_id, 'member_role': role_key})
+            selected_memberships.append({
+                'team_id': team_id,
+                'member_role': role_key,
+                'valid_from': (request.form.get(f'team_{team_id}_valid_from') or '').strip() or None,
+                'valid_to': (request.form.get(f'team_{team_id}_valid_to') or '').strip() or None,
+            })
 
         first_name = (request.form.get('first_name') or '').strip()
         last_name = (request.form.get('last_name') or '').strip()
