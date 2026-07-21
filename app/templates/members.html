@@ -21,6 +21,21 @@
   </div>
 </div>
 <script>
+function updateMembersExportLink(team) {
+    const exportButton = document.getElementById('membersExportButton');
+    if (!exportButton) return;
+
+    const baseUrl = exportButton.dataset.baseUrl || exportButton.getAttribute('href');
+    if (!baseUrl) return;
+
+    if (!team) {
+        exportButton.setAttribute('href', baseUrl);
+        return;
+    }
+
+    exportButton.setAttribute('href', `${baseUrl}?team=${encodeURIComponent(team)}`);
+}
+
 function setMemberTeamFilter(team, btn) {
   document.querySelectorAll('.member-team-btn').forEach(b => {
     b.classList.remove('border-indigo-300', 'dark:border-indigo-700', 'bg-indigo-100', 'dark:bg-indigo-900/40', 'text-indigo-700', 'dark:text-indigo-300');
@@ -37,7 +52,13 @@ function setMemberTeamFilter(team, btn) {
       row.style.display = teams.includes(team) ? '' : 'none';
     }
   });
+
+    updateMembersExportLink(team);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateMembersExportLink(null);
+});
 </script>
 {% endif %}
 {% endblock %}
@@ -47,7 +68,7 @@ function setMemberTeamFilter(team, btn) {
     <div class="p-2 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg mt-0.5">
         <i class="bi bi-person-lines-fill text-indigo-600 dark:text-indigo-400 text-xl"></i>
     </div>
-    <div>
+    <div class="min-w-0 flex-1">
         <h1 class="text-2xl font-bold">Mitglieder</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             {% if is_platform_admin %}
@@ -61,17 +82,30 @@ function setMemberTeamFilter(team, btn) {
     </div>
 </div>
 
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div class="text-sm text-slate-500 dark:text-slate-400">
+        Einzeilig mit allen Kontaktangaben und XLSX-Export für die Mannschaftsliste.
+    </div>
+    <a id="membersExportButton" data-base-url="{{ export_url }}" href="{{ export_url }}" class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-500">
+        <i class="bi bi-file-earmark-excel-fill"></i>
+        Mannschaftsliste als XLSX
+    </a>
+</div>
+
 
 <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
     {% if users %}
     <table class="js-smart-table w-full text-sm">
         <thead class="bg-slate-50 dark:bg-slate-700/50">
             <tr>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Benutzer</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Teams</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 hidden md:table-cell">Position</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300 hidden md:table-cell">Status</th>
-                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Aktion</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Vorname</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Nachname</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300" title="Position">P</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">E-Mail</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Telefon</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">Adresse</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300" title="Status">ST</th>
+                <th class="px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300"></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
@@ -79,56 +113,53 @@ function setMemberTeamFilter(team, btn) {
             {% set row_teams = user.active_memberships | map(attribute='team') | map(attribute='code') | select | list %}
             <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition"
                 data-teams="{{ row_teams | join(',') | upper }}">
-                <td class="px-4 py-3">
-                    <div class="font-medium text-slate-900 dark:text-white">{{ user.display_name or user.username }}</div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400">@{{ user.username }}</div>
-                    {% if user.email %}
-                    <div class="text-xs text-slate-400 dark:text-slate-500">{{ user.email }}</div>
-                    {% endif %}
+                <td class="px-4 py-3 max-w-[10rem] truncate font-medium text-slate-900 dark:text-white">
+                    {{ user.first_name or '–' }}
+                </td>
+                <td class="px-4 py-3 max-w-[10rem] truncate font-medium text-slate-900 dark:text-white">
+                    {{ user.last_name or '–' }}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">
+                    {{ (user.profile and user.profile.position) or '–' }}
+                </td>
+                <td class="px-4 py-3 max-w-[12rem] truncate text-slate-700 dark:text-slate-200" title="{{ user.email or '' }}">
+                    {{ user.email or '–' }}
+                </td>
+                <td class="px-4 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">
+                    {{ (user.profile and user.profile.phone) or '–' }}
+                </td>
+                {% set address_short = [(user.profile and user.profile.address_line1), ([(user.profile and user.profile.postal_code), (user.profile and user.profile.city)] | select | join(' '))] | select | join(', ') %}
+                {% set address_full = [(user.profile and user.profile.address_line1), (user.profile and user.profile.address_line2), ([(user.profile and user.profile.postal_code), (user.profile and user.profile.city)] | select | join(' ')), (user.profile and user.profile.nationality)] | select | join(', ') %}
+                <td class="px-4 py-3 max-w-[14rem] truncate text-slate-700 dark:text-slate-200" title="{{ address_full }}">
+                    {{ address_short or '–' }}
                 </td>
                 <td class="px-4 py-3">
-                    <div class="flex flex-wrap gap-1.5">
-                        {% if user.active_memberships %}
-                            {% for membership in user.active_memberships %}
-                            <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300">
-                                {{ membership.team.name or membership.team.code or membership.team.id }}: {{ role_labels.get(membership.member_role, membership.member_role) }}
-                            </span>
-                            {% endfor %}
-                        {% else %}
-                            <span class="text-xs text-slate-500 dark:text-slate-400">Keine aktive Zuordnung</span>
-                        {% endif %}
-                    </div>
-                    {% if user.pending_memberships %}
-                    <div class="mt-2 flex flex-wrap gap-1.5">
-                        {% for membership in user.pending_memberships %}
-                        <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-                            Beantragt: {{ membership.team.name or membership.team.code or membership.team.id }} · {{ role_labels.get(membership.member_role, membership.member_role) }}
-                        </span>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </td>
-                <td class="px-4 py-3 hidden md:table-cell">
-                    {% if user.profile and user.profile.position %}
-                    <span class="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                        {{ user.profile.position }}
+                    {% if can_edit_members and user.id != current_user.auth_user_id %}
+                    <form method="POST" action="{{ url_for('main.member_toggle_active', target_user_id=user.id) }}"
+                        {% if user.account_status == 'active' %}onsubmit="return confirm('Mitglied {{ user.display_name or user.username }} sperren?')"{% endif %}>
+                        <button type="submit"
+                            class="inline-flex items-center hover:opacity-70 transition"
+                            title="{{ 'Aktiv – klicken zum Sperren' if user.account_status == 'active' else 'Gesperrt – klicken zum Aktivieren' }}">
+                            {% if user.account_status == 'active' %}
+                            <i class="bi bi-patch-check-fill text-green-600 dark:text-green-400 text-base"></i>
+                            {% else %}
+                            <i class="bi bi-slash-circle-fill text-red-500 dark:text-red-400 text-base"></i>
+                            {% endif %}
+                        </button>
+                    </form>
+                    {% elif user.account_status == 'active' %}
+                    <span class="inline-flex items-center" title="Aktiv">
+                        <i class="bi bi-patch-check-fill text-green-600 dark:text-green-400 text-base"></i>
                     </span>
                     {% else %}
-                    <span class="text-xs text-slate-400 dark:text-slate-500">–</span>
+                    <span class="inline-flex items-center" title="Gesperrt">
+                        <i class="bi bi-slash-circle-fill text-red-500 dark:text-red-400 text-base"></i>
+                    </span>
                     {% endif %}
                 </td>
-                <td class="px-4 py-3 hidden md:table-cell">
-                    <div class="text-xs text-slate-500 dark:text-slate-400">
-                        {{ user.account_status|upper }}
-                    </div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400">
-                        {% if user.profile_complete %}Profil vollständig{% else %}Profil unvollständig{% endif %}
-                    </div>
-                </td>
                 <td class="px-4 py-3">
-                    <a href="{{ url_for('main.member_detail', target_user_id=user.id) }}" class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition">
-                        <i class="bi {{ 'bi-sliders' if can_edit_members else 'bi-eye' }}"></i>
-                        {{ 'Bearbeiten' if can_edit_members else 'Ansehen' }}
+                    <a href="{{ url_for('main.member_detail', target_user_id=user.id) }}" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white transition" title="{{ 'Bearbeiten' if can_edit_members else 'Ansehen' }}">
+                        <i class="bi {{ 'bi-pencil' if can_edit_members else 'bi-eye' }}"></i>
                     </a>
                 </td>
             </tr>

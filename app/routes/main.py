@@ -1,11 +1,14 @@
 from functools import wraps
 from datetime import date, datetime, timezone
+from io import BytesIO
 from pathlib import Path
 import re
 from uuid import uuid4
 
 import requests
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for, send_file, abort
+from openpyxl import Workbook
+from openpyxl.styles import Font
 from werkzeug.utils import secure_filename
 
 from ..authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
@@ -323,21 +326,7 @@ def members():
         flash(error, 'danger')
         payload = {'teams': [], 'users': [], 'is_platform_admin': _is_platform_admin(user)}
 
-    # Enrich users with position from local member_profile
-    raw_users = payload.get('users', [])
-    if raw_users:
-        auth_ids = [u['id'] for u in raw_users if u.get('id')]
-        local_users = db.session.query(User).filter(User.auth_user_id.in_(auth_ids)).all()
-        profiles_by_auth_id = {}
-        if local_users:
-            local_ids = [u.id for u in local_users]
-            profiles = db.session.query(MemberProfile).filter(MemberProfile.user_id.in_(local_ids)).all()
-            profiles_by_local_id = {p.user_id: p for p in profiles}
-            for lu in local_users:
-                p = profiles_by_local_id.get(lu.id)
-                profiles_by_auth_id[lu.auth_user_id] = {'position': p.position if p else None}
-        for u in raw_users:
-            u['profile'] = profiles_by_auth_id.get(u.get('id'), {'position': None})
+    raw_users = _enriched_member_rows(payload.get('users', []))
 
     visible_teams = sorted({
         (m.get('team', {}).get('code') or '').strip().upper()
@@ -355,6 +344,136 @@ def members():
         role_labels=_role_labels(),
         can_edit_members=_can_edit_members(user),
         visible_teams=visible_teams,
+        export_url=url_for('main.members_export'),
+    )
+
+
+@bp.route('/members/<int:target_user_id>/toggle-active', methods=['POST'])
+@login_required
+def member_toggle_active(target_user_id):
+    user = current_user()
+    if not _can_edit_members(user):
+        flash('Keine Berechtigung für diese Änderung.', 'danger')
+        return redirect(url_for('main.members'))
+
+    if target_user_id == user.auth_user_id:
+        flash('Du kannst deinen eigenen Account nicht sperren.', 'danger')
+        return redirect(url_for('main.members'))
+
+    success, error = _toggle_member_active(user, target_user_id)
+    if not success:
+        flash(error, 'danger')
+    return redirect(url_for('main.members'))
+
+
+@bp.route('/members/export')
+@login_required
+def members_export():
+    user = current_user()
+    if not _can_view_members(user):
+        flash('Kein Zugriff auf die Mitgliederverwaltung.', 'danger')
+        return redirect(url_for('main.index'))
+
+    payload, error = _fetch_members_for_manager(user)
+    if error:
+        flash(error, 'danger')
+        return redirect(url_for('main.members'))
+
+    raw_users = _enriched_member_rows(payload.get('users', []))
+    selected_team = (request.args.get('team') or '').strip().upper() or None
+    raw_users = _filter_member_rows_by_team(raw_users, selected_team)
+
+    headers = [
+        'Vorname',
+        'Nachname',
+        'Position',
+        'Aktive Teams',
+        'Aktive Rollen',
+        'Status',
+        'E-Mail',
+        'Telefon',
+        'Adresse 1',
+        'Adresse 2',
+        'PLZ',
+        'Ort',
+        'Nationalität',
+        'Geburtsdatum',
+        'Offene Anfragen',
+    ]
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = 'Mannschaftsliste'
+    worksheet.append(headers)
+
+    for item in raw_users:
+        active_memberships = item.get('active_memberships') or []
+        pending_memberships = item.get('pending_memberships') or []
+        profile = item.get('profile') or {}
+        birth_date = profile.get('birth_date')
+        worksheet.append([
+            item.get('first_name') or '',
+            item.get('last_name') or '',
+            profile.get('position') or '',
+            ', '.join(
+                (membership.get('team', {}).get('name') or membership.get('team', {}).get('code') or membership.get('team', {}).get('id') or '')
+                for membership in active_memberships
+            ),
+            ', '.join(
+                _role_labels().get(membership.get('member_role'), membership.get('member_role') or '')
+                for membership in active_memberships
+            ),
+            (item.get('account_status') or '').upper(),
+            item.get('email') or '',
+            profile.get('phone') or '',
+            profile.get('address_line1') or '',
+            profile.get('address_line2') or '',
+            profile.get('postal_code') or '',
+            profile.get('city') or '',
+            profile.get('nationality') or '',
+            birth_date.strftime('%d.%m.%Y') if birth_date else '',
+            ', '.join(
+                f"{membership.get('team', {}).get('name') or membership.get('team', {}).get('code') or membership.get('team', {}).get('id') or ''}: {_role_labels().get(membership.get('member_role'), membership.get('member_role') or '')}"
+                for membership in pending_memberships
+            ),
+        ])
+
+    for cell in worksheet[1]:
+        cell.font = Font(bold=True)
+    worksheet.freeze_panes = 'A2'
+    worksheet.auto_filter.ref = worksheet.dimensions
+
+    column_widths = {
+        'A': 16,
+        'B': 16,
+        'C': 12,
+        'D': 30,
+        'E': 30,
+        'F': 12,
+        'G': 28,
+        'H': 16,
+        'I': 26,
+        'J': 20,
+        'K': 10,
+        'L': 20,
+        'M': 16,
+        'N': 14,
+        'O': 36,
+    }
+    for column, width in column_widths.items():
+        worksheet.column_dimensions[column].width = width
+
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+
+    filename = f'mannschaftsliste_{selected_team}.xlsx' if selected_team else 'mannschaftsliste.xlsx'
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename,
     )
 
 
@@ -838,6 +957,83 @@ def _fetch_members_for_manager(user):
     return response.json() or {}, None
 
 
+def _enriched_member_rows(raw_users):
+    users = list(raw_users or [])
+    if not users:
+        return []
+
+    auth_ids = [item['id'] for item in users if item.get('id')]
+    local_users = db.session.query(User).filter(User.auth_user_id.in_(auth_ids)).all() if auth_ids else []
+    profiles_by_auth_id = {}
+    if local_users:
+        local_ids = [item.id for item in local_users]
+        profiles = db.session.query(MemberProfile).filter(MemberProfile.user_id.in_(local_ids)).all()
+        profiles_by_local_id = {profile.user_id: profile for profile in profiles}
+        for local_user in local_users:
+            profile = profiles_by_local_id.get(local_user.id)
+            profiles_by_auth_id[local_user.auth_user_id] = {
+                'first_name': profile.first_name if profile else None,
+                'last_name': profile.last_name if profile else None,
+                'position': profile.position if profile else None,
+                'shirt_size': profile.shirt_size if profile else None,
+                'jersey_number': profile.jersey_number if profile else None,
+                'phone': profile.phone if profile else None,
+                'address_line1': profile.address_line1 if profile else None,
+                'address_line2': profile.address_line2 if profile else None,
+                'postal_code': profile.postal_code if profile else None,
+                'city': profile.city if profile else None,
+                'nationality': profile.nationality if profile else None,
+                'birth_date': profile.birth_date if profile else None,
+            }
+
+    empty_profile = {
+        'first_name': None,
+        'last_name': None,
+        'position': None,
+        'shirt_size': None,
+        'jersey_number': None,
+        'phone': None,
+        'address_line1': None,
+        'address_line2': None,
+        'postal_code': None,
+        'city': None,
+        'nationality': None,
+        'birth_date': None,
+    }
+    for item in users:
+        item['profile'] = profiles_by_auth_id.get(item.get('id'), empty_profile)
+        profile = item['profile']
+        name_parts = (item.get('display_name') or item.get('username') or '').split()
+        item['first_name'] = profile.get('first_name') or (name_parts[0] if name_parts else '')
+        item['last_name'] = profile.get('last_name') or (' '.join(name_parts[1:]) if len(name_parts) > 1 else '')
+
+    users.sort(
+        key=lambda item: (
+            (item.get('display_name') or item.get('username') or '').lower(),
+            (item.get('username') or '').lower(),
+        )
+    )
+    return users
+
+
+def _filter_member_rows_by_team(raw_users, team_code):
+    users = list(raw_users or [])
+    if not team_code:
+        return users
+
+    filtered = []
+    for item in users:
+        active_memberships = item.get('active_memberships') or []
+        membership_team_codes = {
+            (membership.get('team', {}).get('code') or '').strip().upper()
+            for membership in active_memberships
+            if (membership.get('team', {}).get('code') or '').strip()
+        }
+        if team_code in membership_team_codes:
+            filtered.append(item)
+    return filtered
+
+
 def _fetch_member_detail(user, target_user_id):
     response, error = _auth_internal_request(
         'GET',
@@ -874,6 +1070,26 @@ def _update_member_memberships(user, target_user_id, active_memberships):
         if response.status_code == 404:
             return False, 'Mitglied nicht gefunden.'
         return False, 'Mitgliedschaft konnte nicht gespeichert werden.'
+    return True, None
+
+
+def _toggle_member_active(user, target_user_id):
+    response, error = _auth_internal_request(
+        'POST',
+        f'/api/team-manager/members/{target_user_id}/toggle-active',
+        json={'approver_auth_user_id': user.auth_user_id},
+    )
+    if error:
+        return False, error
+    if response.status_code >= 400:
+        current_app.logger.warning('tt-auth toggle-active failed: %s %s', response.status_code, response.text)
+        if response.status_code == 403:
+            return False, 'Keine Berechtigung für diese Änderung.'
+        if response.status_code == 404:
+            return False, 'Mitglied nicht gefunden.'
+        if response.status_code == 400:
+            return False, 'Status kann für dieses Konto nicht geändert werden.'
+        return False, 'Status konnte nicht geändert werden.'
     return True, None
 
 
