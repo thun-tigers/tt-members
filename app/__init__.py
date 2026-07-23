@@ -7,6 +7,7 @@ import logging
 from werkzeug.middleware.proxy_fix import ProxyFix
 from .authz import has_role_permission, is_platform_admin, normalize_memberships, normalize_permissions
 from .config import Config
+from .db_bootstrap import schema_setup_lock
 from .extensions import db, limiter
 
 
@@ -156,51 +157,52 @@ def create_app(config_class=Config):
             return {'pending_antraege_count': 0, 'pending_messages_count': 0, 'message_items': []}
 
     with app.app_context():
-        db.create_all()
-        inspector = inspect(db.engine)
-        if 'user' in inspector.get_table_names():
-            columns = {column['name'] for column in inspector.get_columns('user')}
-            if 'first_name' not in columns:
-                db.session.execute(text('ALTER TABLE user ADD COLUMN first_name VARCHAR(80)'))
-            if 'last_name' not in columns:
-                db.session.execute(text('ALTER TABLE user ADD COLUMN last_name VARCHAR(80)'))
-        if 'member_profile' in inspector.get_table_names():
-            columns = {column['name'] for column in inspector.get_columns('member_profile')}
-            if 'email' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN email VARCHAR(255)'))
-            if 'birth_date' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN birth_date DATE'))
-            if 'address_line1' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN address_line1 VARCHAR(120)'))
-            if 'address_line2' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN address_line2 VARCHAR(120)'))
-            if 'postal_code' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN postal_code VARCHAR(20)'))
-            if 'city' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN city VARCHAR(120)'))
-            if 'nationality' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN nationality VARCHAR(80)'))
-            if 'license_number' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_number VARCHAR(80)'))
-            if 'jersey_number' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN jersey_number VARCHAR(40)'))
-            if 'position' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN position VARCHAR(80)'))
-            if 'shirt_size' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN shirt_size VARCHAR(40)'))
-            if 'license_photo_filename' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_filename VARCHAR(255)'))
-            if 'license_photo_status' not in columns:
-                db.session.execute(text("ALTER TABLE member_profile ADD COLUMN license_photo_status VARCHAR(20) NOT NULL DEFAULT 'none'"))
-            if 'license_photo_review_reason' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_review_reason TEXT'))
-            if 'license_photo_uploaded_at' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_uploaded_at TIMESTAMP'))
-            if 'license_photo_reviewed_at' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_reviewed_at TIMESTAMP'))
-            if 'license_photo_reviewed_by_user_id' not in columns:
-                db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_reviewed_by_user_id INTEGER'))
-            db.session.commit()
+        with schema_setup_lock(db.engine):
+            db.create_all()
+            inspector = inspect(db.engine)
+            if 'user' in inspector.get_table_names():
+                columns = {column['name'] for column in inspector.get_columns('user')}
+                if 'first_name' not in columns:
+                    db.session.execute(text('ALTER TABLE user ADD COLUMN first_name VARCHAR(80)'))
+                if 'last_name' not in columns:
+                    db.session.execute(text('ALTER TABLE user ADD COLUMN last_name VARCHAR(80)'))
+            if 'member_profile' in inspector.get_table_names():
+                columns = {column['name'] for column in inspector.get_columns('member_profile')}
+                if 'email' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN email VARCHAR(255)'))
+                if 'birth_date' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN birth_date DATE'))
+                if 'address_line1' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN address_line1 VARCHAR(120)'))
+                if 'address_line2' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN address_line2 VARCHAR(120)'))
+                if 'postal_code' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN postal_code VARCHAR(20)'))
+                if 'city' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN city VARCHAR(120)'))
+                if 'nationality' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN nationality VARCHAR(80)'))
+                if 'license_number' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_number VARCHAR(80)'))
+                if 'jersey_number' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN jersey_number VARCHAR(40)'))
+                if 'position' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN position VARCHAR(80)'))
+                if 'shirt_size' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN shirt_size VARCHAR(40)'))
+                if 'license_photo_filename' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_filename VARCHAR(255)'))
+                if 'license_photo_status' not in columns:
+                    db.session.execute(text("ALTER TABLE member_profile ADD COLUMN license_photo_status VARCHAR(20) NOT NULL DEFAULT 'none'"))
+                if 'license_photo_review_reason' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_review_reason TEXT'))
+                if 'license_photo_uploaded_at' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_uploaded_at TIMESTAMP'))
+                if 'license_photo_reviewed_at' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_reviewed_at TIMESTAMP'))
+                if 'license_photo_reviewed_by_user_id' not in columns:
+                    db.session.execute(text('ALTER TABLE member_profile ADD COLUMN license_photo_reviewed_by_user_id INTEGER'))
+                db.session.commit()
 
         upload_root = Path(app.config.get('UPLOAD_ROOT', str(Path('instance') / 'uploads')))
         (upload_root / 'license-photos').mkdir(parents=True, exist_ok=True)
